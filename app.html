@@ -1643,6 +1643,28 @@ const LSS={ load(k,d){ try{const v=JSON.parse(localStorage.getItem(k)); return v
 const Notis={ kan(){ return typeof Notification!=="undefined"; }, ok(){ return this.kan()&&Notification.permission==="granted"; },
   async be(){ if(!this.kan())return false; if(Notification.permission==="granted")return true; try{ return (await Notification.requestPermission())==="granted"; }catch(e){ return false; } },
   skicka(titel,text){ try{ if(this.ok()) new Notification(titel,{body:text,icon:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230E1726'/%3E%3Cpath d='M5 20V7l7-3 7 3v13' stroke='%23C2F24D' stroke-width='2.2' fill='none'/%3E%3C/svg%3E"}); }catch(e){} } };
+// Supabase-synk (REST + auth) – förar-data följer med mellan enheter när inloggad.
+const SB={
+  cfg(){ try{return JSON.parse(localStorage.getItem("msp_sb"))||{};}catch(e){return {};} },
+  setCfg(c){ try{localStorage.setItem("msp_sb",JSON.stringify(c));}catch(e){} },
+  base(){ return (this.cfg().url||"").replace(/\/+$/,""); },
+  configured(){ const c=this.cfg(); return !!(c.url&&c.anon); },
+  loggedIn(){ const c=this.cfg(); return !!(c.url&&c.anon&&c.token&&c.driverId); },
+  status(){ if(this.loggedIn())return "online"; if(this.configured())return "config"; return "local"; },
+  async signIn(email,password){ const c=this.cfg(); if(!c.url||!c.anon) throw new Error("Ange Supabase-URL och anon-nyckel först.");
+    const r=await fetch(this.base()+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:c.anon,"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+    const j=await r.json(); if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||"Inloggning misslyckades.");
+    let driverId=null, orgId=null;
+    try{ const m=await fetch(this.base()+"/rest/v1/memberships?select=driver_id,org_id&limit=1",{headers:{apikey:c.anon,Authorization:"Bearer "+j.access_token}}); const ma=await m.json(); if(Array.isArray(ma)&&ma[0]){ driverId=ma[0].driver_id; orgId=ma[0].org_id; } }catch(e){}
+    if(!driverId) throw new Error("Inloggad, men kontot saknar koppling till en förare (memberships.driver_id). Be admin koppla dig.");
+    this.setCfg({...c,token:j.access_token,uid:j.user&&j.user.id,driverId,orgId,email}); return true; },
+  signOut(){ const c=this.cfg(); this.setCfg({url:c.url,anon:c.anon}); },
+  async _req(method,path,body){ const c=this.cfg(); const r=await fetch(this.base()+"/rest/v1/"+path,{method,headers:{apikey:c.anon,Authorization:"Bearer "+c.token,"Content-Type":"application/json",Prefer:"return=representation"},body:body?JSON.stringify(body):undefined}); if(!r.ok) throw new Error(await r.text()); return method==="DELETE"?true:r.json(); },
+  list(table){ return this._req("GET",table+"?select=*&order=created_at.desc"); },
+  insert(table,row){ const c=this.cfg(); return this._req("POST",table,{...row,org_id:c.orgId,driver_id:c.driverId}); },
+  remove(table,id){ return this._req("DELETE",table+"?id=eq."+id); },
+  removeBy(table,filter){ return this._req("DELETE",table+"?"+filter); }
+};
 const KALENDER_KEYWORDS=[["kista","Möte med Kund AB"],["kungsgatan","Leverans City"],["nacka","Möte, Nacka"],["platinav","Materialhämtning"],["jakobsgatan","Kundbesök Jakobsgatan"]];
 function kalenderSyfte(r){ const a=(r.stoppAdress+" "+r.startAdress).toLowerCase(); for(const [k,t] of KALENDER_KEYWORDS){ if(a.includes(k)) return t; } return null; }
 function reserakningPDF(driver,tjResor,utlagg,tjmil,ers){ const w=window.open("","_blank"); if(!w)return;
@@ -1686,6 +1708,18 @@ function BilKartaModal({lat,lng,adress,onClose}){
   return (<div className="fixed inset-0 bg-black/50 z-[2300] flex items-center justify-center p-4" onClick={onClose}><Card className="w-[600px] max-w-full overflow-hidden" onClick={e=>e.stopPropagation()}><div className="flex items-center justify-between p-4 border-b"><div><div className="font-bold">Var står bilen?</div><div className="text-xs text-gray-500">{adress}</div></div><button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button></div><div ref={ref} style={{height:380}}></div></Card></div>);
 }
 
+// Adressökning med förslag (typeahead) via OpenStreetMap/Nominatim – som Google Maps.
+function AdressSok({value,onChange,onPick,pick,placeholder,className}){
+  const [q,setQ]=useState(value||""); const [res,setRes]=useState([]); const [open,setOpen]=useState(false); const [laddar,setLaddar]=useState(false); const tmr=useRef();
+  useEffect(()=>{ setQ(value||""); },[value]);
+  const sok=(text)=>{ clearTimeout(tmr.current); if(text.trim().length<3){ setRes([]); setOpen(false); return; } setLaddar(true); tmr.current=setTimeout(async()=>{ try{ const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=se&q="+encodeURIComponent(text),{headers:{"Accept-Language":"sv"}}); const j=await r.json(); setRes(Array.isArray(j)?j:[]); setOpen(true); }catch(e){ setRes([]); } setLaddar(false); },350); };
+  const valj=(item)=>{ const v=pick?pick(item):item.display_name; setQ(v); onChange&&onChange(v); onPick&&onPick(item); setOpen(false); setRes([]); };
+  return (<div className="relative">
+    <input value={q} onChange={e=>{ setQ(e.target.value); onChange&&onChange(e.target.value); sok(e.target.value); }} onFocus={()=>res.length&&setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),160)} placeholder={placeholder} className={className||"w-full border rounded px-2 py-1.5 text-sm"}/>
+    {laddar&&q.trim().length>=3&&!open&&<div className="absolute right-2 top-2 text-xs text-gray-300">…</div>}
+    {open&&res.length>0&&<div className="absolute z-[60] left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-auto">{res.map((it,i)=>(<button key={i} type="button" onMouseDown={(e)=>{e.preventDefault(); valj(it);}} className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-0 flex gap-2 items-start"><svg className="w-4 h-4 mt-0.5 text-[#2F4BFF] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="2" strokeWidth="2"/></svg><div className="min-w-0"><div className="text-sm font-medium truncate">{it.display_name.split(",").slice(0,2).join(",")}</div><div className="text-xs text-gray-400 truncate">{it.display_name}</div></div></button>))}</div>}
+  </div>);
+}
 function ForarVy({driver,resor,setResor}){
   const mina=resor.filter(r=>r.forareId===driver.id).sort((a,b)=>b.startTid-a.startTid);
   const fnamn=driver.namn.split(" ")[0];
@@ -1750,9 +1784,28 @@ function ForarVy({driver,resor,setResor}){
   const anomalier=detekteraAvvikelser(mina).slice(0,3);
   const minEco=ecoScores(resor).find(e=>e.driver.id===driver.id);
   const utlSum=utlagg.reduce((s,u)=>s+u.belopp,0);
-  const sparaUtlagg=(u)=>{ setUtlagg(x=>[u,...x]); setKvittoOpen(false); visa(T("Utlägg sparat ✓","Expense saved ✓")); };
-  const sparaFel=(f)=>{ setFelrap(x=>[f,...x]); setFelOpen(false); visa(T("Felrapport skickad till admin ✓","Report sent ✓")); if(Notis.ok())Notis.skicka("Milvy","Felrapport skickad: "+f.typ); };
-  const laggPlats=()=>{ if(!nyPlatsAdr.trim()||!nyPlatsNamn.trim())return; setPlatser(p=>({...p,[nyPlatsAdr.trim()]:nyPlatsNamn.trim()})); setNyPlatsAdr(""); setNyPlatsNamn(""); };
+  // ---- Supabase-synk (data följer föraren mellan enheter) ----
+  const [sbVer,setSbVer]=useState(0); const sbStat=SB.status();
+  const [sbUrl,setSbUrl]=useState(()=>SB.cfg().url||""); const [sbAnon,setSbAnon]=useState(()=>SB.cfg().anon||"");
+  const [sbEmail,setSbEmail]=useState(()=>SB.cfg().email||""); const [sbPw,setSbPw]=useState(""); const [sbBusy,setSbBusy]=useState(false); const [sbMsg,setSbMsg]=useState("");
+  const syncDown=async()=>{ if(!SB.loggedIn())return; try{
+    const ex=await SB.list("driver_expenses"); if(Array.isArray(ex)) setUtlagg(ex.map(r=>({id:r.id,belopp:Number(r.amount),kategori:r.category,datum:r.created_at,resaId:""})));
+    const pl=await SB.list("driver_places"); if(Array.isArray(pl)){ const m={}; pl.forEach(r=>m[r.address_key]=r.label); setPlatser(m); }
+    const is=await SB.list("vehicle_issues"); if(Array.isArray(is)) setFelrap(is.map(r=>({id:r.id,typ:r.type,text:r.description,datum:r.created_at})));
+  }catch(e){} };
+  useEffect(()=>{ syncDown(); },[]);
+  const sbLoggaIn=async()=>{ setSbBusy(true); setSbMsg(""); SB.setCfg({...SB.cfg(),url:sbUrl.trim(),anon:sbAnon.trim()}); try{ await SB.signIn(sbEmail.trim(),sbPw); setSbPw(""); setSbVer(v=>v+1); await syncDown(); visa(T("Synkad mellan enheter ✓","Synced across devices ✓")); }catch(e){ setSbMsg(String(e.message||e).slice(0,220)); } setSbBusy(false); };
+  const sbLoggaUt=()=>{ SB.signOut(); setSbVer(v=>v+1); visa(T("Utloggad – data sparas lokalt","Signed out – stored locally")); };
+  const sparaUtlagg=async(u)=>{ setKvittoOpen(false); visa(T("Utlägg sparat ✓","Expense saved ✓"));
+    if(SB.loggedIn()){ try{ const row=await SB.insert("driver_expenses",{amount:u.belopp,category:u.kategori,note:null}); const rr=Array.isArray(row)?row[0]:row; setUtlagg(x=>[{id:rr.id,belopp:Number(rr.amount),kategori:rr.category,datum:rr.created_at,resaId:""},...x]); return; }catch(e){} }
+    setUtlagg(x=>[u,...x]); };
+  const taUtlagg=(id)=>{ setUtlagg(x=>x.filter(y=>y.id!==id)); if(SB.loggedIn())SB.remove("driver_expenses",id).catch(()=>{}); };
+  const sparaFel=async(f)=>{ setFelOpen(false); visa(T("Felrapport skickad till admin ✓","Report sent ✓")); if(Notis.ok())Notis.skicka("Milvy","Felrapport skickad: "+f.typ);
+    if(SB.loggedIn()){ try{ const ftyp=f.typ==="Skada / buckla"?"Skada":f.typ==="Däck / punktering"?"Däck":f.typ; const row=await SB.insert("vehicle_issues",{type:ftyp,description:f.text}); const rr=Array.isArray(row)?row[0]:row; setFelrap(x=>[{id:rr.id,typ:rr.type,text:rr.description,datum:rr.created_at},...x]); return; }catch(e){} }
+    setFelrap(x=>[f,...x]); };
+  const laggPlats=async()=>{ const a=nyPlatsAdr.trim(), n=nyPlatsNamn.trim(); if(!a||!n)return; setNyPlatsAdr(""); setNyPlatsNamn(""); setPlatser(p=>({...p,[a]:n}));
+    if(SB.loggedIn()){ try{ await SB.insert("driver_places",{address_key:a,label:n}); }catch(e){} } };
+  const taPlats=(a)=>{ setPlatser(p=>{const x={...p}; delete x[a]; return x;}); if(SB.loggedIn())SB.removeBy("driver_places","address_key=eq."+encodeURIComponent(a)).catch(()=>{}); };
   const slaPaNotis=async()=>{ const ok=await Notis.be(); setNotisPa(ok); visa(ok?T("Notiser på ✓","Notifications on ✓"):T("Notiser nekades i webbläsaren","Notifications blocked")); if(ok)Notis.skicka("Milvy",T("Du får nu påminnelser om oklassade resor.","You'll get reminders for unclassified trips.")); };
 
   const FB="rounded-xl p-3 text-sm flex items-center gap-2";
@@ -1825,7 +1878,7 @@ function ForarVy({driver,resor,setResor}){
           <div className="text-sm text-gray-500 mb-3">{tjmil} mil · {kr(ers)} kr {T("ersättning","reimb.")} · {utlagg.length} {T("utlägg","expenses")} ({kr(Math.round(utlSum))} kr)</div>
           <button onClick={()=>reserakningPDF(driver,mina.filter(r=>r.resetyp==="Tjänsteresa"),utlagg,tjmil,ers)} className="w-full py-2.5 rounded-lg font-semibold text-white" style={{background:"#0E1726"}}>{T("Skapa PDF-underlag","Create PDF")}</button></Card>
         <Card className="overflow-hidden"><div className="px-4 py-2 bg-gray-50 border-b text-sm font-semibold text-gray-700">{T("Mina utlägg","My expenses")}</div>
-          <div className="divide-y">{utlagg.length===0?<div className="p-5 text-center text-sm text-gray-400">{T("Inga utlägg än. Fota ditt första kvitto!","No expenses yet. Scan your first receipt!")}</div>:utlagg.map(u=>(<div key={u.id} className="p-3 flex items-center justify-between text-sm"><div><div className="font-medium">{u.kategori}</div><div className="text-xs text-gray-400">{new Date(u.datum).toLocaleDateString("sv-SE")}</div></div><div className="flex items-center gap-3"><span className="font-mono font-semibold">{u.belopp.toFixed(2)} kr</span><button onClick={()=>setUtlagg(x=>x.filter(y=>y.id!==u.id))} className="text-gray-300 hover:text-red-500">✕</button></div></div>))}</div></Card>
+          <div className="divide-y">{utlagg.length===0?<div className="p-5 text-center text-sm text-gray-400">{T("Inga utlägg än. Fota ditt första kvitto!","No expenses yet. Scan your first receipt!")}</div>:utlagg.map(u=>(<div key={u.id} className="p-3 flex items-center justify-between text-sm"><div><div className="font-medium">{u.kategori}</div><div className="text-xs text-gray-400">{new Date(u.datum).toLocaleDateString("sv-SE")}</div></div><div className="flex items-center gap-3"><span className="font-mono font-semibold">{u.belopp.toFixed(2)} kr</span><button onClick={()=>taUtlagg(u.id)} className="text-gray-300 hover:text-red-500">✕</button></div></div>))}</div></Card>
         {felrap.length>0&&<Card className="overflow-hidden"><div className="px-4 py-2 bg-gray-50 border-b text-sm font-semibold text-gray-700">{T("Skickade felrapporter","Sent reports")}</div><div className="divide-y">{felrap.map(f=>(<div key={f.id} className="p-3 text-sm"><div className="font-medium">{f.typ}</div><div className="text-xs text-gray-400">{f.text||"—"} · {new Date(f.datum).toLocaleDateString("sv-SE")}</div></div>))}</div></Card>}
       </div>}
 
@@ -1840,6 +1893,19 @@ function ForarVy({driver,resor,setResor}){
       {ftab==="profil"&&<div className="space-y-3">
         <h2 className="font-bold text-lg">{T("Profil & inställningar","Profile & settings")}</h2>
         <Card className="p-4 flex items-center gap-3"><div className="w-12 h-12 rounded-full grid place-items-center font-bold text-[#0E1726]" style={{background:"#C2F24D"}}>{driver.namn.split(" ").map(s=>s[0]).join("")}</div><div className="min-w-0"><div className="font-semibold">{driver.namn}</div><div className="text-xs text-gray-400 truncate">{T("Förare","Driver")} · {driver.epost||"forare@milvy.se"}</div></div></Card>
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-1"><div className="font-semibold">{T("Synk mellan enheter","Sync across devices")}</div><span className={"text-[10px] font-mono px-2 py-0.5 rounded-full "+(sbStat==="online"?"bg-green-100 text-green-700":sbStat==="config"?"bg-amber-100 text-amber-700":"bg-gray-100 text-gray-500")}>{sbStat==="online"?T("SYNKAD","SYNCED"):sbStat==="config"?T("EJ INLOGGAD","NOT SIGNED IN"):T("LOKALT","LOCAL")}</span></div>
+          <div className="text-xs text-gray-500 mb-3">{sbStat==="online"?T("Utlägg, platser och felrapporter sparas i molnet och följer dig på alla enheter.","Expenses, places and reports live in the cloud and follow you on every device."):T("Just nu sparas utlägg, platser och felrapporter lokalt på den här enheten. Koppla Supabase för att synka mellan enheter.","Right now expenses, places and reports are stored locally on this device. Connect Supabase to sync across devices.")}</div>
+          {sbStat==="online" ? <div className="flex items-center justify-between"><div className="text-sm truncate">{SB.cfg().email}</div><button onClick={sbLoggaUt} className="text-sm text-[#2F4BFF] shrink-0">{T("Logga ut","Sign out")}</button></div> :
+           <div className="space-y-2">
+             <input value={sbUrl} onChange={e=>setSbUrl(e.target.value)} placeholder="Supabase URL (https://xxx.supabase.co)" className="w-full border rounded px-2 py-1.5 text-sm"/>
+             <input value={sbAnon} onChange={e=>setSbAnon(e.target.value)} placeholder="Anon public key" className="w-full border rounded px-2 py-1.5 text-sm"/>
+             <div className="grid grid-cols-2 gap-2"><input value={sbEmail} onChange={e=>setSbEmail(e.target.value)} placeholder={T("E-post","Email")} className="border rounded px-2 py-1.5 text-sm"/><input value={sbPw} onChange={e=>setSbPw(e.target.value)} type="password" placeholder={T("Lösenord","Password")} className="border rounded px-2 py-1.5 text-sm"/></div>
+             {sbMsg&&<div className="text-xs text-red-600 break-words">{sbMsg}</div>}
+             <button onClick={sbLoggaIn} disabled={sbBusy} className="w-full py-2 rounded-lg text-white text-sm font-medium disabled:opacity-60" style={{background:"#0E1726"}}>{sbBusy?T("Loggar in…","Signing in…"):T("Koppla & logga in","Connect & sign in")}</button>
+             <div className="text-[11px] text-gray-400">{T("Kräver att 05_forarfunktioner.sql körts och att ditt konto kopplats till en förare. Lösenordet går direkt till din Supabase – Milvy lagrar det aldrig.","Requires 05_forarfunktioner.sql and your account linked to a driver. Password goes straight to your Supabase – Milvy never stores it.")}</div>
+           </div>}
+        </Card>
         <Card className="divide-y">
           <SRow label={T("Klass-vy","Classify view")} desc={vy?VY_INFO[vy][0]:T("ej vald","not set")} right={<button onClick={()=>setValjare(true)} className="text-sm font-medium text-[#2F4BFF]">{T("Byt","Change")}</button>}/>
           <SRow label={T("Notiser om oklassade resor","Reminders for unclassified trips")} desc={T("Push när det finns resor att klassa","Push when trips need classifying")} right={<Toggle on={notisPa} set={()=>{ if(notisPa)setNotisPa(false); else slaPaNotis(); }}/>}/>
@@ -1848,9 +1914,8 @@ function ForarVy({driver,resor,setResor}){
           <SRow label={T("Språk","Language")} right={<select value={sprak} onChange={e=>setSprak(e.target.value)} className="border rounded px-2 py-1 text-sm"><option value="sv">Svenska</option><option value="en">English</option></select>}/>
         </Card>
         <Card className="p-4"><div className="font-semibold mb-1">{T("Favoritplatser","Favorite places")}</div><div className="text-xs text-gray-500 mb-3">{T("Döp adresser så journalen blir tydligare och AI:n gissar bättre.","Name addresses for a clearer log and better AI guesses.")}</div>
-          <div className="space-y-2 mb-3">{Object.keys(platser).length===0?<div className="text-sm text-gray-400">{T("Inga sparade platser.","No saved places.")}</div>:Object.keys(platser).map(a=>(<div key={a} className="flex items-center justify-between text-sm p-2 rounded-lg border"><div className="min-w-0 truncate"><span className="font-medium">{platser[a]}</span> <span className="text-gray-400">{a}</span></div><button onClick={()=>setPlatser(p=>{const x={...p}; delete x[a]; return x;})} className="text-gray-300 hover:text-red-500 shrink-0">✕</button></div>))}</div>
-          <div className="grid grid-cols-2 gap-2"><input value={nyPlatsNamn} onChange={e=>setNyPlatsNamn(e.target.value)} placeholder={T("Namn (t.ex. Hem)","Name (e.g. Home)")} className="border rounded px-2 py-1.5 text-sm"/><input value={nyPlatsAdr} onChange={e=>setNyPlatsAdr(e.target.value)} placeholder={T("Adress","Address")} list="mina-adresser" className="border rounded px-2 py-1.5 text-sm"/></div>
-          <datalist id="mina-adresser">{Array.from(new Set(mina.flatMap(r=>[r.startAdress.split(",")[0],r.stoppAdress.split(",")[0]]))).map(a=><option key={a} value={a}/>)}</datalist>
+          <div className="space-y-2 mb-3">{Object.keys(platser).length===0?<div className="text-sm text-gray-400">{T("Inga sparade platser.","No saved places.")}</div>:Object.keys(platser).map(a=>(<div key={a} className="flex items-center justify-between text-sm p-2 rounded-lg border"><div className="min-w-0 truncate"><span className="font-medium">{platser[a]}</span> <span className="text-gray-400">{a}</span></div><button onClick={()=>taPlats(a)} className="text-gray-300 hover:text-red-500 shrink-0">✕</button></div>))}</div>
+          <div className="grid grid-cols-2 gap-2"><input value={nyPlatsNamn} onChange={e=>setNyPlatsNamn(e.target.value)} placeholder={T("Namn (t.ex. Hem)","Name (e.g. Home)")} className="border rounded px-2 py-1.5 text-sm"/><AdressSok value={nyPlatsAdr} onChange={setNyPlatsAdr} pick={(it)=>it.display_name.split(",").slice(0,2).join(",").trim()} placeholder={T("Sök adress…","Search address…")}/></div>
           <button onClick={laggPlats} className="w-full mt-2 py-2 rounded-lg text-sm font-semibold border">{T("Lägg till plats","Add place")}</button></Card>
         <Card className="p-4"><div className="font-semibold mb-1">{T("Genvägar & widget","Shortcuts & widget")}</div><div className="text-sm text-gray-500">{T("I mobilappen kan du lägga Milvy som widget på hemskärmen och säga „Hej Siri, klassa senaste resan som tjänst”.","In the mobile app you can add Milvy as a home-screen widget and say \"Hey Siri, classify my last trip as business\".")}</div><div className="flex gap-2 mt-3 flex-wrap"><span className="text-xs px-2 py-1 rounded-full bg-gray-100">📱 {T("Hemskärms-widget","Home widget")}</span><span className="text-xs px-2 py-1 rounded-full bg-gray-100">🎙️ Siri / Google</span><span className="text-xs px-2 py-1 rounded-full bg-gray-100">⌚ {T("Klocka","Watch")}</span></div></Card>
       </div>}

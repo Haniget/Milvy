@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Milvy – Smart körjournal & flottkoll för svenska företag</title>
+<meta name="description" content="Automatisk, Skatteverket-färdig körjournal med realtidskarta, zoner, bilpool och AI-insikter. Plug-and-play i OBD-uttaget – igång på minuter." />
+<meta name="theme-color" content="#0E1726" />
+<link rel="canonical" href="https://milvy.se/" />
+<!-- Open Graph / sociala medier -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Milvy – Smart körjournal & flottkoll" />
+<meta property="og:description" content="Automatisk körjournal, realtidskarta, zoner, bilpool och AI – för svenska företag." />
+<meta property="og:locale" content="sv_SE" />
+<meta property="og:url" content="https://milvy.se/" />
+<meta name="twitter:card" content="summary_large_image" />
+<!-- Favicon (inline) -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230E1726'/%3E%3Cpath d='M5 20V7l7-3 7 3v13' stroke='%23C2F24D' stroke-width='2.2' fill='none' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{colors:{ink:'#0E1726',lime:'#C2F24D',brandblue:'#2F4BFF',paper:'#EDEEEA'},fontFamily:{sans:['"IBM Plex Sans"','sans-serif'],display:['Archivo','sans-serif'],mono:['"IBM Plex Mono"','monospace']}}}}</script>
+<style>
+  html{scroll-behavior:smooth}
+  body{font-family:'IBM Plex Sans',sans-serif;color:#0E1726;background:#EDEEEA}
+  h1,h2,h3{font-family:'Archivo',sans-serif;letter-spacing:-.02em}
+  .mono{font-family:'IBM Plex Mono',monospace}
+  .card{border:1.5px solid #0E1726;border-radius:14px}
+  details>summary{list-style:none;cursor:pointer}
+  details>summary::-webkit-details-marker{display:none}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  .floaty{animation:floaty 6s ease-in-out infinite}
+  a,button{transition:color .15s ease, background-color .15s ease, transform .15s ease, filter .15s ease}
+  .lift{transition:transform .2s ease, box-shadow .2s ease}
+  .lift:hover{transform:translateY(-4px);box-shadow:0 22px 44px -26px rgba(14,23,38,.45)}
+  .card{transition:transform .2s ease, box-shadow .2s ease}
+  .cta:hover{transform:translateY(-2px)}
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s cubic-bezier(.2,.7,.2,1), transform .6s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  .blob{position:absolute;border-radius:9999px;filter:blur(80px);opacity:.45;z-index:0;pointer-events:none}
+</style>
+</head>
+<body>
+
+<!-- ANNONSBAR -->
+<div class="bg-ink text-white text-center text-xs py-2 px-4">🚀 Milvy lanseras 2026 — <a href="#demo" class="underline font-semibold text-lime">boka tidig tillgång</a></div>
+
+<!-- NAV -->
+<header class="sticky top-0 z-50 bg-paper/90 backdrop-blur border-b border-[#0E1726]/10">
+  <div class="max-w-6xl mx-auto px-5 h-16 flex items-center gap-6">
+    <a href="#" class="flex items-center gap-2 mr-2">
+      <span class="w-8 h-8 rounded-lg bg-ink flex items-center justify-center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 20V7l7-3 7 3v13" stroke="#C2F24D" stroke-width="2.2" stroke-linejoin="round"/><path d="M12 4v16" stroke="#2F4BFF" stroke-width="2.2"/></svg></span>
+      <span class="font-display font-extrabold text-xl">Milvy</span>
+    </a>
+    <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-[#3F4D66] flex-1">
+      <a href="#sa-funkar" class="hover:text-ink">Så funkar det</a>
+      <a href="#funktioner" class="hover:text-ink">Funktioner</a>
+      <a href="#integrationer" class="hover:text-ink">Integrationer</a>
+      <a href="#priser" class="hover:text-ink">Priser</a>
+      <a href="#faq" class="hover:text-ink">FAQ</a>
+    </nav>
+    <a href="#" class="hidden sm:inline text-sm font-medium text-[#3F4D66] hover:text-ink">Logga in</a>
+    <a href="#demo" class="text-sm font-semibold px-4 py-2 rounded-lg bg-ink text-white hover:bg-[#16233A]">Boka demo</a>
+    <button id="mbtn" class="md:hidden p-1" aria-label="Meny"><svg class="w-6 h-6" fill="none" stroke="#0E1726" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+  </div>
+  <div id="mmenu" class="hidden md:hidden border-t border-[#0E1726]/10 bg-paper px-5 py-3 flex-col gap-3 text-sm font-medium">
+    <a href="#sa-funkar" class="block py-1">Så funkar det</a><a href="#funktioner" class="block py-1">Funktioner</a><a href="#integrationer" class="block py-1">Integrationer</a><a href="#priser" class="block py-1">Priser</a><a href="#faq" class="block py-1">FAQ</a><a href="#" class="block py-1">Logga in</a>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="relative overflow-hidden">
+  <div class="blob bg-lime -top-24 -left-24 w-80 h-80"></div>
+  <div class="blob bg-brandblue/40 top-32 -right-28 w-96 h-96"></div>
+  <div class="relative max-w-6xl mx-auto px-5 pt-14 sm:pt-20 pb-20 grid lg:grid-cols-[1.05fr_1fr] gap-12 items-center">
+    <div>
+      <div class="inline-flex items-center gap-2 mb-5 px-3 py-1 rounded-full bg-white card text-xs font-semibold"><span class="w-2 h-2 rounded-full bg-lime"></span> Ny: AI-assistent på svenska</div>
+      <h1 class="text-[40px] sm:text-[56px] leading-[0.98] font-extrabold">Körjournalen som<br>sköter sig <span class="relative inline-block">själv<span class="absolute left-0 -bottom-1 w-full h-3 bg-lime -z-10"></span></span>.</h1>
+      <p class="mt-6 text-lg text-[#3F4D66] max-w-md">Automatisk, Skatteverket-färdig körjournal med realtidskarta, zoner, bilpool och AI-insikter. Plug-and-play i OBD-uttaget – igång på minuter.</p>
+      <div class="mt-8 flex flex-wrap gap-3">
+        <a href="#demo" class="cta px-6 py-3 rounded-xl bg-lime text-ink font-semibold hover:brightness-95">Boka en demo →</a>
+        <a href="#sa-funkar" class="lift px-6 py-3 rounded-xl card font-semibold hover:bg-white">Se hur det funkar</a>
+      </div>
+      <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-[#8A93A0]">
+        <span class="flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4 10-10" stroke="#1F9D55" stroke-width="2.4" stroke-linecap="round"/></svg> Ingen installationskostnad</span>
+        <span class="flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4 10-10" stroke="#1F9D55" stroke-width="2.4" stroke-linecap="round"/></svg> GDPR & svensk support</span>
+      </div>
+    </div>
+    <div class="floaty">
+      <div class="card bg-white overflow-hidden shadow-[0_30px_70px_-34px_rgba(14,23,38,.5)]">
+        <div class="h-9 bg-ink flex items-center gap-1.5 px-4"><span class="w-2.5 h-2.5 rounded-full bg-[#3A4660]"></span><span class="w-2.5 h-2.5 rounded-full bg-[#3A4660]"></span><span class="w-2.5 h-2.5 rounded-full bg-[#3A4660]"></span><span class="ml-3 mono text-[11px] text-[#8FA0B8]">app.milvy.se</span></div>
+        <div class="p-5">
+          <div class="mono text-[10px] tracking-widest text-[#8A93A0] uppercase mb-3">Flottans nyckeltal</div>
+          <div class="flex border-t-2 border-ink">
+            <div class="flex-1 py-3 pr-4 border-r border-[#E4E6E0]"><div class="mono text-2xl font-semibold">1&nbsp;467</div><div class="mono text-[9px] uppercase tracking-wide text-[#8A93A0] mt-1">Resor</div></div>
+            <div class="flex-1 py-3 px-4 border-r border-[#E4E6E0]"><div class="mono text-2xl font-semibold text-brandblue">91&nbsp;000</div><div class="mono text-[9px] uppercase tracking-wide text-[#8A93A0] mt-1">Kr ersättning</div></div>
+            <div class="flex-1 py-3 pl-4"><div class="mono text-2xl font-semibold">14</div><div class="mono text-[9px] uppercase tracking-wide text-[#8A93A0] mt-1">Fordon</div></div>
+          </div>
+          <div class="mt-4 flex items-end gap-2 h-24">
+            <div class="flex-1 bg-lime rounded-t" style="height:40%"></div><div class="flex-1 bg-lime rounded-t" style="height:62%"></div><div class="flex-1 bg-lime rounded-t" style="height:50%"></div><div class="flex-1 bg-brandblue rounded-t" style="height:85%"></div><div class="flex-1 bg-lime rounded-t" style="height:70%"></div><div class="flex-1 bg-lime rounded-t" style="height:55%"></div><div class="flex-1 bg-brandblue rounded-t" style="height:78%"></div>
+          </div>
+          <div class="mt-4 flex items-center justify-between bg-ink rounded-xl p-3">
+            <div class="flex items-center gap-2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 3h9l3 3v15H6z" stroke="#C2F24D" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="#C2F24D" stroke-width="2.2" stroke-linecap="round"/></svg><span class="text-white text-sm font-semibold">Skatteverket-färdig</span></div>
+            <span class="text-ink bg-lime rounded-md text-xs font-semibold px-2.5 py-1">Exportera ↗</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LOGOS -->
+<section class="border-y border-[#0E1726]/10 bg-white">
+  <div class="max-w-6xl mx-auto px-5 py-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-[#9AA1AC] mono text-sm">
+    <span class="text-[11px] tracking-widest uppercase text-[#C0C4BC]">Litas på av</span>
+    <span class="font-semibold">Creative Consulting</span><span class="font-semibold">NordBygg AB</span><span class="font-semibold">Mälardalens El</span><span class="font-semibold">Sörmland Transport</span><span class="font-semibold">VVS-Proffsen</span>
+  </div>
+</section>
+
+<!-- PROBLEM / LÖSNING -->
+<section class="max-w-6xl mx-auto px-5 py-20 grid md:grid-cols-2 gap-10 items-center">
+  <div>
+    <div class="mono text-[11px] tracking-widest text-[#8A93A0] uppercase mb-3">Slut på krånglet</div>
+    <h2 class="text-4xl font-extrabold">Excel-journaler och gissningar kostar tid och pengar</h2>
+    <p class="mt-4 text-[#3F4D66]">Manuella körjournaler glöms bort, klassas fel och blir en huvudvärk vid deklaration. Bränsle, trängselskatt och bokningar lever i olika system. Milvy samlar allt – automatiskt.</p>
+  </div>
+  <div class="grid grid-cols-2 gap-3">
+    <div class="card bg-white p-4"><div class="mono text-2xl font-semibold text-brandblue">~12h</div><div class="text-xs text-[#3F4D66] mt-1">sparad admin per bil & år</div></div>
+    <div class="card bg-white p-4"><div class="mono text-2xl font-semibold">99,4%</div><div class="text-xs text-[#3F4D66] mt-1">korrekt klassning</div></div>
+    <div class="card bg-white p-4"><div class="mono text-2xl font-semibold">5 min</div><div class="text-xs text-[#3F4D66] mt-1">till igång</div></div>
+    <div class="card bg-white p-4"><div class="mono text-2xl font-semibold text-brandblue">0 kr</div><div class="text-xs text-[#3F4D66] mt-1">installationskostnad</div></div>
+  </div>
+</section>
+
+<!-- SÅ FUNKAR DET -->
+<section id="sa-funkar" class="bg-white border-y border-[#0E1726]/10">
+  <div class="max-w-6xl mx-auto px-5 py-20">
+    <div class="max-w-xl mb-12"><div class="mono text-[11px] tracking-widest text-[#8A93A0] uppercase mb-3">Så funkar det</div><h2 class="text-4xl font-extrabold">Igång på tre steg</h2></div>
+    <div class="grid md:grid-cols-3 gap-6">
+      <div class="card bg-paper p-6"><div class="mono text-3xl font-semibold text-brandblue mb-3">01</div><h3 class="text-lg font-bold">Sätt i enheten</h3><p class="mt-2 text-sm text-[#3F4D66]">Plugga in den lilla GPS-enheten i fordonets OBD-uttag. Ingen verkstad, ingen kabeldragning.</p></div>
+      <div class="card bg-paper p-6"><div class="mono text-3xl font-semibold text-brandblue mb-3">02</div><h3 class="text-lg font-bold">Resorna loggas</h3><p class="mt-2 text-sm text-[#3F4D66]">Varje körning registreras automatiskt och klassas som tjänst eller privat enligt dina regler.</p></div>
+      <div class="card bg-paper p-6"><div class="mono text-3xl font-semibold text-brandblue mb-3">03</div><h3 class="text-lg font-bold">Granska & exportera</h3><p class="mt-2 text-sm text-[#3F4D66]">Godkänn och skicka en Skatteverket-färdig körjournal – på minuter, inte dagar.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FUNKTIONER -->
+<section id="funktioner" class="max-w-6xl mx-auto px-5 py-20">
+  <div class="max-w-2xl mb-12"><div class="mono text-[11px] tracking-widest text-[#8A93A0] uppercase mb-3">Funktioner</div><h2 class="text-4xl font-extrabold">Allt om flottan – på ett ställe</h2></div>
+  <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+    <div class="card lift bg-white p-6"><div class="w-11 h-11 rounded-xl bg-lime flex items-center justify-center mb-4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h6l6 6v10a2 2 0 01-2 2z" stroke="#0E1726" stroke-width="2" stroke-linejoin="round"/></svg></div><h3 class="font-bold text-lg">Automatisk körjournal</h3><p class="mt-2 text-sm text-[#3F4D66]">Resor loggas och klassas utan handpåläggning. Attestering och export ingår.</p></div>
+    <div class="card lift bg-white p-6"><div class="w-11 h-11 rounded-xl bg-brandblue flex items-center justify-center mb-4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.5 7-12a7 7 0 10-14 0c0 6.5 7 12 7 12z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="9" r="2.3" stroke="#fff" stroke-width="2"/></svg></div><h3 class="font-bold text-lg">Realtidskarta</h3><p class="mt-2 text-sm text-[#3F4D66]">Se var fordonen är just nu och spela upp historiska rutter.</p></div>
+    <div class="card lift bg-white p-6"><div class="w-11 h-11 rounded-xl bg-ink flex items-center justify-center mb-4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 21a9 9 0 100-18 9 9 0 000 18z" stroke="#C2F24D" stroke-width="2"/><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="#C2F24D" stroke-width="2"/></svg></div><h3 class="font-bold text-lg">Zoner & larm</h3><p class="mt-2 text-sm text-[#3F4D66]">Rita egna geofence-zoner med tidsregler och få larm vid in-/utfart.</p></div>
+    <div class="card lift bg-white p-6"><div class="w-11 h-11 rounded-xl bg-lime flex items-center justify-center mb-4"><svg width="22" height="22" viewBox="0 0 24 24" fill="#0E1726"><path d="M12 2l1.9 5.6L19.5 9l-4.4 3.2L16.5 18 12 14.7 7.5 18l1.4-5.8L4.5 9l5.6-1.4L12 2z"/></svg></div><h3 class="font-bold text-lg">AI-insikter</h3><p class="mt-2 text-sm text-[#3F4D66]">Avvikelser, förarbeteende, prediktivt underhåll och en assistent på svenska.</p></div>
+    <div class="card lift bg-white p-6"><div class="w-11 h-11 rounded-xl bg-brandblue flex items-center justify-center mb-4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg></div><h3 class="font-bold text-lg">Bilpool</h3><p class="mt-2 text-sm text-[#3F4D66]">Boka poolbilar med tillgänglighet i realtid och regler som du styr.</p></div>
+    <div class="card lift bg-white p-6"><div class="w-11 h-11 rounded-xl bg-ink flex items-center justify-center mb-4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 21V5a2 2 0 012-2h10a2 2 0 012 2v16l-3.5-2-3.5 2-3.5-2L5 21z" stroke="#C2F24D" stroke-width="2" stroke-linejoin="round"/></svg></div><h3 class="font-bold text-lg">Kvitton & tankkort</h3><p class="mt-2 text-sm text-[#3F4D66]">Tankkort matchas automatiskt mot rätt bil via GPS. Kvitton läses in med AI.</p></div>
+  </div>
+</section>
+
+<!-- INTEGRATIONER -->
+<section id="integrationer" class="bg-white border-y border-[#0E1726]/10">
+  <div class="max-w-6xl mx-auto px-5 py-20 text-center">
+    <div class="mono text-[11px] tracking-widest text-[#8A93A0] uppercase mb-3">Integrationer</div>
+    <h2 class="text-4xl font-extrabold">Kopplar till verktygen du redan har</h2>
+    <p class="mt-4 text-[#3F4D66] max-w-xl mx-auto">Lön, ekonomi och BI – plus ett öppet API.</p>
+    <div class="mt-10 flex flex-wrap justify-center gap-3">
+      <span class="card bg-paper px-5 py-3 font-semibold">Fortnox</span><span class="card bg-paper px-5 py-3 font-semibold">Visma</span><span class="card bg-paper px-5 py-3 font-semibold">Hogia Lön</span><span class="card bg-paper px-5 py-3 font-semibold">Kontek</span><span class="card bg-paper px-5 py-3 font-semibold">Power BI</span><span class="card bg-paper px-5 py-3 font-semibold">Skatteverket</span><span class="card bg-paper px-5 py-3 font-semibold">Slack</span><span class="card bg-paper px-5 py-3 font-semibold">Öppet API</span>
+    </div>
+  </div>
+</section>
+
+<!-- STATS BAND -->
+<section class="bg-ink text-white">
+  <div class="max-w-6xl mx-auto px-5 py-14 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+    <div><div class="mono text-4xl font-semibold text-lime">99,4%</div><div class="mono text-[10px] uppercase tracking-widest text-[#8FA0B8] mt-2">Korrekt klassning</div></div>
+    <div><div class="mono text-4xl font-semibold">5 min</div><div class="mono text-[10px] uppercase tracking-widest text-[#8FA0B8] mt-2">Till igång</div></div>
+    <div><div class="mono text-4xl font-semibold text-lime">~12h</div><div class="mono text-[10px] uppercase tracking-widest text-[#8FA0B8] mt-2">Sparat per bil & år</div></div>
+    <div><div class="mono text-4xl font-semibold">100%</div><div class="mono text-[10px] uppercase tracking-widest text-[#8FA0B8] mt-2">Svensk support</div></div>
+  </div>
+</section>
+
+<!-- PRISER -->
+<section id="priser" class="max-w-6xl mx-auto px-5 py-20">
+  <div class="text-center max-w-xl mx-auto mb-12"><div class="mono text-[11px] tracking-widest text-[#8A93A0] uppercase mb-3">Priser</div><h2 class="text-4xl font-extrabold">Enkelt, per fordon</h2><p class="mt-4 text-[#3F4D66]">Ingen bindningstid på mjukvaran. Hårdvaran ingår.</p></div>
+  <div class="grid md:grid-cols-3 gap-5 max-w-4xl mx-auto">
+    <div class="card bg-white p-7"><h3 class="font-bold text-lg">Start</h3><div class="mt-3 mono text-4xl font-semibold">89<span class="text-base text-[#8A93A0]"> kr/bil/mån</span></div><p class="mt-2 text-sm text-[#3F4D66]">Automatisk körjournal & karta.</p><ul class="mt-5 space-y-2 text-sm text-[#3F4D66]"><li>✓ Körjournal & export</li><li>✓ Realtidskarta</li><li>✓ Mobilapp</li></ul><a href="#demo" class="mt-6 block text-center px-4 py-2.5 rounded-lg card font-semibold">Välj Start</a></div>
+    <div class="card bg-ink text-white p-7 relative"><span class="absolute -top-3 left-7 bg-lime text-ink mono text-[10px] font-bold px-2 py-1 rounded">POPULÄRAST</span><h3 class="font-bold text-lg">Pro</h3><div class="mt-3 mono text-4xl font-semibold text-lime">139<span class="text-base text-[#8FA0B8]"> kr/bil/mån</span></div><p class="mt-2 text-sm text-[#8FA0B8]">Allt i Start + AI och zoner.</p><ul class="mt-5 space-y-2 text-sm text-[#C9D2DE]"><li>✓ AI-insikter & assistent</li><li>✓ Zoner, larm & bilpool</li><li>✓ Integrationer & öppet API</li></ul><a href="#demo" class="mt-6 block text-center px-4 py-2.5 rounded-lg bg-lime text-ink font-semibold">Boka demo</a></div>
+    <div class="card bg-white p-7"><h3 class="font-bold text-lg">Enterprise</h3><div class="mt-3 mono text-4xl font-semibold">Offert</div><p class="mt-2 text-sm text-[#3F4D66]">För större flottor & koncern.</p><ul class="mt-5 space-y-2 text-sm text-[#3F4D66]"><li>✓ Multi-organisation</li><li>✓ SLA & dedikerad kontakt</li><li>✓ Anpassade integrationer</li></ul><a href="#demo" class="mt-6 block text-center px-4 py-2.5 rounded-lg card font-semibold">Kontakta oss</a></div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="bg-white border-y border-[#0E1726]/10">
+  <div class="max-w-3xl mx-auto px-5 py-20">
+    <div class="text-center mb-10"><div class="mono text-[11px] tracking-widest text-[#8A93A0] uppercase mb-3">FAQ</div><h2 class="text-4xl font-extrabold">Vanliga frågor</h2></div>
+    <div class="space-y-3">
+      <details class="card bg-paper p-4"><summary class="flex justify-between items-center font-semibold">Behöver jag installera något i bilen?<span class="text-brandblue">+</span></summary><p class="mt-3 text-sm text-[#3F4D66]">Nej – enheten pluggas i OBD-uttaget på under en minut. Ingen verkstad krävs.</p></details>
+      <details class="card bg-paper p-4"><summary class="flex justify-between items-center font-semibold">Är körjournalen godkänd av Skatteverket?<span class="text-brandblue">+</span></summary><p class="mt-3 text-sm text-[#3F4D66]">Ja, journalen innehåller allt som krävs: datum, sträcka, syfte, klassning och attestering – och exporteras färdig.</p></details>
+      <details class="card bg-paper p-4"><summary class="flex justify-between items-center font-semibold">Hur hanteras förarnas integritet?<span class="text-brandblue">+</span></summary><p class="mt-3 text-sm text-[#3F4D66]">Privatresor kan döljas (integritetsläge), och föraren ser bara sina egna resor. All data lagras enligt GDPR i EU.</p></details>
+      <details class="card bg-paper p-4"><summary class="flex justify-between items-center font-semibold">Är det bindningstid?<span class="text-brandblue">+</span></summary><p class="mt-3 text-sm text-[#3F4D66]">Ingen bindningstid på mjukvaran. Hårdvaran ingår i abonnemanget.</p></details>
+      <details class="card bg-paper p-4"><summary class="flex justify-between items-center font-semibold">Fungerar det med elbilar?<span class="text-brandblue">+</span></summary><p class="mt-3 text-sm text-[#3F4D66]">Ja. Vi hanterar dessutom ersättning för hemmaladdning av tjänste-elbilar.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- CTA + KONTAKT -->
+<section id="demo" class="max-w-6xl mx-auto px-5 py-20">
+  <div class="card bg-ink text-white p-8 sm:p-12 grid md:grid-cols-2 gap-10 items-center">
+    <div>
+      <h2 class="text-3xl sm:text-4xl font-extrabold">Boka en kostnadsfri demo</h2>
+      <p class="mt-4 text-[#8FA0B8]">Lämna dina uppgifter så hör vi av oss inom en arbetsdag och visar Milvy på din egen flotta.</p>
+      <div class="mt-6 space-y-2 text-sm text-[#C9D2DE]"><div>📧 hej@milvy.se</div><div>📞 010-123 45 67</div><div>📍 Västerås, Sverige</div></div>
+    </div>
+    <form id="demoform" class="space-y-3">
+      <input required placeholder="Namn" class="w-full px-4 py-3 rounded-lg bg-[#16233A] border border-[#25334C] text-white placeholder-[#8FA0B8]" />
+      <input required type="email" placeholder="E-post" class="w-full px-4 py-3 rounded-lg bg-[#16233A] border border-[#25334C] text-white placeholder-[#8FA0B8]" />
+      <input placeholder="Företag" class="w-full px-4 py-3 rounded-lg bg-[#16233A] border border-[#25334C] text-white placeholder-[#8FA0B8]" />
+      <input placeholder="Antal fordon" class="w-full px-4 py-3 rounded-lg bg-[#16233A] border border-[#25334C] text-white placeholder-[#8FA0B8]" />
+      <button class="w-full px-4 py-3 rounded-lg bg-lime text-ink font-semibold">Skicka förfrågan</button>
+      <p id="formok" class="hidden text-lime text-sm text-center">Tack! Vi hör av oss inom en arbetsdag.</p>
+    </form>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="bg-paper border-t border-[#0E1726]/10">
+  <div class="max-w-6xl mx-auto px-5 py-12 grid sm:grid-cols-2 md:grid-cols-4 gap-8 text-sm">
+    <div><div class="flex items-center gap-2 mb-3"><span class="w-7 h-7 rounded-lg bg-ink flex items-center justify-center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 20V7l7-3 7 3v13" stroke="#C2F24D" stroke-width="2.2"/></svg></span><span class="font-display font-extrabold">Milvy</span></div><p class="text-[#8A93A0]">Smart körjournal & flottkoll för svenska företag.</p></div>
+    <div><div class="mono text-[10px] uppercase tracking-widest text-[#8A93A0] mb-3">Produkt</div><ul class="space-y-2 text-[#3F4D66]"><li><a href="#funktioner" class="hover:text-ink">Funktioner</a></li><li><a href="#priser" class="hover:text-ink">Priser</a></li><li><a href="#integrationer" class="hover:text-ink">Integrationer</a></li><li><a href="#faq" class="hover:text-ink">FAQ</a></li></ul></div>
+    <div><div class="mono text-[10px] uppercase tracking-widest text-[#8A93A0] mb-3">Företag</div><ul class="space-y-2 text-[#3F4D66]"><li><a href="#" class="hover:text-ink">Om oss</a></li><li><a href="#demo" class="hover:text-ink">Kontakt</a></li><li><a href="#" class="hover:text-ink">Support</a></li><li><a href="#" class="hover:text-ink">Lediga jobb</a></li></ul></div>
+    <div><div class="mono text-[10px] uppercase tracking-widest text-[#8A93A0] mb-3">Juridik</div><ul class="space-y-2 text-[#3F4D66]"><li><a href="#" class="hover:text-ink">Integritetspolicy</a></li><li><a href="#" class="hover:text-ink">Användarvillkor</a></li><li><a href="#" class="hover:text-ink">GDPR & PUB-avtal</a></li><li><a href="#" class="hover:text-ink">Cookies</a></li></ul></div>
+  </div>
+  <div class="border-t border-[#0E1726]/10"><div class="max-w-6xl mx-auto px-5 py-5 flex flex-wrap justify-between gap-3 text-xs text-[#8A93A0] mono"><span>© 2026 Milvy AB · 559000-0000</span><span>Byggt i Sverige</span></div></div>
+</footer>
+
+<!-- COOKIE-BANNER -->
+<div id="cookie" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-xl card bg-white p-4 shadow-xl hidden sm:flex items-center gap-4 text-sm">
+  <span class="flex-1 text-[#3F4D66]">Vi använder endast nödvändiga cookies för att sajten ska fungera. <a href="#" class="underline">Läs mer</a>.</span>
+  <button id="cookieok" class="px-4 py-2 rounded-lg bg-ink text-white font-semibold whitespace-nowrap">Okej</button>
+</div>
+
+<script>
+  // mobilmeny
+  var mb=document.getElementById('mbtn'), mm=document.getElementById('mmenu');
+  mb&&mb.addEventListener('click',function(){ mm.classList.toggle('hidden'); mm.classList.toggle('flex'); });
+  mm&&mm.querySelectorAll('a').forEach(function(a){a.addEventListener('click',function(){mm.classList.add('hidden');mm.classList.remove('flex');});});
+  // scroll-in-animation
+  try{
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });},{threshold:.12, rootMargin:'0px 0px -40px 0px'});
+    document.querySelectorAll('section h2, section .card').forEach(function(el){ el.classList.add('reveal'); io.observe(el); });
+  }catch(e){}
+  // FAQ +/−
+  document.querySelectorAll('details').forEach(function(d){ d.addEventListener('toggle',function(){ var s=d.querySelector('summary span'); if(s) s.textContent=d.open?'−':'+'; }); });
+  // formulär (demo – koppla till Formspree/egen backend)
+  var f=document.getElementById('demoform');
+  f&&f.addEventListener('submit',function(e){ e.preventDefault(); document.getElementById('formok').classList.remove('hidden'); f.reset(); });
+  // cookie-banner
+  try{ if(!localStorage.getItem('msp_cookie')){ document.getElementById('cookie').classList.remove('hidden'); } }catch(e){}
+  var ck=document.getElementById('cookieok');
+  ck&&ck.addEventListener('click',function(){ try{localStorage.setItem('msp_cookie','1');}catch(e){} document.getElementById('cookie').classList.add('hidden'); });
+</script>
+</body>
+</html>

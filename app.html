@@ -1585,24 +1585,288 @@ function GlobalSearch({setRoute}){
 }
 
 /* ============================ FÖRARVY (personal) ============================ */
+/* ---- Förar-klassning: ruttminne, AI-förslag, vy-väljare ---- */
+function ruttKey(r){ return r.startAdress.split(",")[0]+" → "+r.stoppAdress.split(",")[0]; }
+const RUTTMINNE={ load(){ try{return JSON.parse(localStorage.getItem("msp_ruttminne"))||{};}catch(e){return {};} }, save(m){ try{localStorage.setItem("msp_ruttminne",JSON.stringify(m));}catch(e){} } };
+let MILVY_PLATSER={};
+function klassForslag(r,minne){
+  const key=ruttKey(r);
+  if(minne&&minne[key]) return {typ:minne[key],konf:0.97,kand:true};
+  const sl=MILVY_PLATSER[r.stoppAdress.split(",")[0]], st=MILVY_PLATSER[r.startAdress.split(",")[0]];
+  if((sl&&/hem|bostad/i.test(sl))||(st&&/hem|bostad/i.test(st))) return {typ:"Privatresa",konf:0.9,kand:false,plats:true};
+  if(sl&&/kund|möte|kontor|jobb|verkstad/i.test(sl)) return {typ:"Tjänsteresa",konf:0.92,kand:false,plats:true};
+  const h=r.startTid.getHours(), d=r.startTid.getDay(), adr=(r.startAdress+" "+r.stoppAdress).toLowerCase();
+  let typ="Tjänsteresa", konf=0.66;
+  if(/sigurdsgatan|kontor|kund|kista|platinav|föreningsgatan|stentorps|jakobsgatan/.test(adr)){ typ="Tjänsteresa"; konf=0.9; }
+  if(/hem|bostad|villa/.test(adr)){ typ="Privatresa"; konf=0.86; }
+  if(d===0||d===6){ typ="Privatresa"; konf=0.82; }
+  else if(h<6||h>=19){ typ="Privatresa"; konf=0.73; }
+  return {typ,konf,kand:false};
+}
+const VY_INFO={
+  knappar:["Knappar","Ett kort i taget med Privat/Tjänst-knappar. Enklast att börja med."],
+  svep:["Svep","Dra kortet höger för Tjänst, vänster för Privat – eller tryck. Snabbast i en hög."],
+  ai:["AI-auto","AI klassar kända resor automatiskt och föreslår resten. Du bekräftar."],
+  lista:["Lista","Alla oklassade resor i en lista – bra överblick på större skärm."]
+};
+function VyMini({k}){
+  const box="rounded-lg border-2 border-[#0E1726] w-11 h-14 shrink-0 p-1 flex flex-col gap-1 bg-white overflow-hidden";
+  if(k==="knappar") return (<div className={box}><div className="flex-1 rounded bg-gray-100"></div><div className="flex gap-1"><div className="flex-1 h-2.5 rounded border border-[#0E1726]"></div><div className="flex-1 h-2.5 rounded" style={{background:"#C2F24D"}}></div></div></div>);
+  if(k==="svep") return (<div className={box+" items-center justify-center"}><div className="w-7 h-10 rounded bg-gray-100 border border-[#0E1726]" style={{transform:"rotate(8deg)"}}></div></div>);
+  if(k==="ai") return (<div className={box}><div className="h-2.5 rounded" style={{background:"#C2F24D"}}></div><div className="h-2.5 rounded bg-gray-100"></div><div className="h-2.5 rounded border-2 border-[#2F4BFF]"></div></div>);
+  return (<div className={box}><div className="h-2.5 rounded bg-gray-100"></div><div className="h-2.5 rounded bg-gray-100"></div><div className="h-2.5 rounded bg-gray-100"></div></div>);
+}
+function VyValjare({current,onPick,onClose,first}){
+  return (<div className="fixed inset-0 z-[2200] bg-black/50 flex items-center justify-center p-4" onClick={first?undefined:onClose}>
+    <Card className="w-[470px] max-w-full p-5" onClick={e=>e.stopPropagation()}>
+      <div className="flex items-center justify-between mb-1"><h2 className="text-lg font-bold">{first?"Välj hur du vill klassa":"Byt klass-vy"}</h2>{!first&&<button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button>}</div>
+      <p className="text-sm text-gray-500 mb-4">{first?"Hur vill du klassa dina körningar? Du kan ändra när som helst via knappen „Vy”.":"Välj vyn som passar dig bäst."}</p>
+      <div className="space-y-2">{Object.keys(VY_INFO).map(k=>{ const [t,d]=VY_INFO[k]; return (
+        <button key={k} onClick={()=>onPick(k)} className={"w-full text-left flex items-center gap-3 p-3 rounded-xl border-2 transition "+(current===k?"border-[#2F4BFF] bg-[#EEF1FF]":"border-gray-200 hover:border-gray-300")}>
+          <VyMini k={k}/>
+          <div className="min-w-0"><div className="font-semibold flex items-center gap-2">{t}{current===k&&<span className="text-[10px] font-mono text-[#2F4BFF]">VALD</span>}</div><div className="text-xs text-gray-500">{d}</div></div>
+        </button>); })}</div>
+    </Card></div>);
+}
+function ResaKort({r,dm}){ return (<React.Fragment>
+  <div className="flex justify-between text-xs font-mono text-gray-400 mb-3"><span>{dm(r.startTid)} · {fmtTid(r.startTid)}</span><span>{r.fordonRegNr}</span></div>
+  <div className="flex items-center gap-2 font-semibold"><span className="w-3 h-3 rounded-sm" style={{background:"#C2F24D"}}></span>{r.startAdress.split(",")[0]}</div>
+  <div className="ml-[5px] my-1 border-l-2 border-dotted border-gray-300 h-4"></div>
+  <div className="flex items-center gap-2 font-semibold"><span className="w-3 h-3 rounded-sm" style={{background:"#0E1726"}}></span>{r.stoppAdress.split(",")[0]}</div>
+  <div className="border-t my-4"></div>
+  <div className="flex gap-10"><div><div className="text-2xl font-mono font-bold leading-none">{(r.avstandKm/10).toFixed(1)} mil</div><div className="text-[10px] font-mono uppercase tracking-wide text-gray-400 mt-1">Sträcka</div></div><div><div className="text-2xl font-mono font-bold leading-none">{fmtTid(r.startTid)}</div><div className="text-[10px] font-mono uppercase tracking-wide text-gray-400 mt-1">Start</div></div></div>
+</React.Fragment>); }
+
+/* ---- Förar-hjälpmedel: utlägg, felrapport, notiser, kalender, PDF ---- */
+function dmKort(t){ return (""+t.getDate()).padStart(2,"0")+"."+(""+(t.getMonth()+1)).padStart(2,"0"); }
+const LSS={ load(k,d){ try{const v=JSON.parse(localStorage.getItem(k)); return v==null?d:v;}catch(e){return d;} }, save(k,v){ try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} } };
+const Notis={ kan(){ return typeof Notification!=="undefined"; }, ok(){ return this.kan()&&Notification.permission==="granted"; },
+  async be(){ if(!this.kan())return false; if(Notification.permission==="granted")return true; try{ return (await Notification.requestPermission())==="granted"; }catch(e){ return false; } },
+  skicka(titel,text){ try{ if(this.ok()) new Notification(titel,{body:text,icon:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230E1726'/%3E%3Cpath d='M5 20V7l7-3 7 3v13' stroke='%23C2F24D' stroke-width='2.2' fill='none'/%3E%3C/svg%3E"}); }catch(e){} } };
+const KALENDER_KEYWORDS=[["kista","Möte med Kund AB"],["kungsgatan","Leverans City"],["nacka","Möte, Nacka"],["platinav","Materialhämtning"],["jakobsgatan","Kundbesök Jakobsgatan"]];
+function kalenderSyfte(r){ const a=(r.stoppAdress+" "+r.startAdress).toLowerCase(); for(const [k,t] of KALENDER_KEYWORDS){ if(a.includes(k)) return t; } return null; }
+function reserakningPDF(driver,tjResor,utlagg,tjmil,ers){ const w=window.open("","_blank"); if(!w)return;
+  const rad=tjResor.map(r=>"<tr><td>"+fmtDatum(r.startTid)+"</td><td>"+r.startAdress.split(",")[0]+" → "+r.stoppAdress.split(",")[0]+"</td><td style='text-align:right'>"+r.avstandKm+"</td><td>"+(r.resesyfte||"")+"</td></tr>").join("");
+  const uSum=utlagg.reduce((s,u)=>s+u.belopp,0);
+  const uRad=utlagg.map(u=>"<tr><td>"+new Date(u.datum).toLocaleDateString("sv-SE")+"</td><td>"+u.kategori+"</td><td style='text-align:right'>"+u.belopp.toFixed(2)+"</td></tr>").join("");
+  w.document.write("<html><head><title>Reseräkning – "+driver.namn+"</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#0E1726}h1{font-size:18px;margin:0}h2{font-size:14px;margin-top:20px}table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left}th{background:#0E1726;color:#fff}tfoot td{font-weight:bold;background:#f3f4f6}@media print{.noprint{display:none}}</style></head><body><h1>Reseräkning</h1><div style='font-size:12px;color:#555'>"+driver.namn+" · juni 2026 · genererad "+new Date().toLocaleDateString("sv-SE")+"</div><button class='noprint' onclick='window.print()' style='margin-top:10px;padding:8px 14px;background:#2F4BFF;color:#fff;border:none;border-radius:6px;cursor:pointer'>Skriv ut / Spara som PDF</button><div style='margin-top:14px;font-size:13px'><b>Tjänstemil:</b> "+tjmil+" mil &nbsp;·&nbsp; <b>Milersättning (25 kr/mil):</b> "+ers+" kr &nbsp;·&nbsp; <b>Utlägg:</b> "+uSum.toFixed(2)+" kr &nbsp;·&nbsp; <b>Totalt att få:</b> "+(ers+uSum).toFixed(2)+" kr</div><h2>Tjänsteresor</h2><table><thead><tr><th>Datum</th><th>Sträcka</th><th>km</th><th>Syfte</th></tr></thead><tbody>"+rad+"</tbody></table><h2>Utlägg</h2><table><thead><tr><th>Datum</th><th>Kategori</th><th>Belopp (kr)</th></tr></thead><tbody>"+(uRad||"<tr><td colspan=3>Inga utlägg.</td></tr>")+"</tbody><tfoot><tr><td colspan='2'>Summa utlägg</td><td style='text-align:right'>"+uSum.toFixed(2)+"</td></tr></tfoot></table></body></html>");
+  w.document.close(); }
+function KvittoModal({resor,driver,onClose,onSave}){
+  const mina=resor.filter(r=>r.forareId===driver.id).sort((a,b)=>b.startTid-a.startTid).slice(0,25);
+  const [bild,setBild]=useState(null); const [belopp,setBelopp]=useState(""); const [kat,setKat]=useState("Drivmedel"); const [resaId,setResaId]=useState(mina[0]?mina[0].id:""); const [busy,setBusy]=useState(false); const [info,setInfo]=useState("");
+  const onFile=(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f)return; const rd=new FileReader(); rd.onload=()=>setBild(rd.result); rd.readAsDataURL(f); };
+  const aiLas=async()=>{ if(!bild){ setInfo("Ta eller välj ett foto först."); return; } setBusy(true); setInfo("");
+    try{ if(AI.available()){ const out=await AI.vision(bild,"Läs av kvittot. Returnera ENDAST JSON {belopp:number, kategori:'Drivmedel'|'Parkering'|'Mat'|'Övrigt'}.","Du läser svenska kvitton.",300); const j=extractJson(out); if(j){ if(j.belopp!=null)setBelopp(""+j.belopp); if(j.kategori)setKat(j.kategori); setInfo("✓ AI läste av kvittot."); } else setInfo("Kunde inte tolka – fyll i manuellt."); }
+      else setInfo("Lägg till API-nyckel för AI-avläsning. Fyll i manuellt så länge."); }catch(e){ setInfo("AI-fel – fyll i manuellt."); } setBusy(false); };
+  const spara=()=>{ if(!belopp)return; onSave({id:"u"+Date.now(),belopp:Number(belopp),kategori:kat,resaId,harBild:!!bild,datum:new Date().toISOString()}); };
+  return (<div className="fixed inset-0 bg-black/50 z-[2300] flex items-center justify-center p-4" onClick={onClose}><Card className="w-[420px] max-w-full p-5" onClick={e=>e.stopPropagation()}>
+    <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-lg">Nytt utlägg</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button></div>
+    <label className="block border-2 border-dashed rounded-xl p-4 text-center text-sm text-gray-500 cursor-pointer mb-3">{bild?<img src={bild} alt="kvitto" className="max-h-40 mx-auto rounded"/>:<span>📷 Fota eller välj kvitto</span>}<input type="file" accept="image/*" capture="environment" onChange={onFile} className="hidden"/></label>
+    <button onClick={aiLas} disabled={busy} className="w-full mb-3 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-60" style={{background:"linear-gradient(135deg,#0E1726,#2F4BFF)"}}>{busy?"AI läser…":"✦ Läs av med AI"}</button>
+    {info&&<div className="text-xs bg-[#EEF1FF] text-[#22356B] rounded px-2 py-1 mb-3">{info}</div>}
+    <div className="grid grid-cols-2 gap-2 mb-3"><label className="text-xs text-gray-500 block">Belopp (kr)<input value={belopp} onChange={e=>setBelopp(e.target.value)} inputMode="decimal" className="w-full border rounded px-2 py-1.5 text-sm"/></label><label className="text-xs text-gray-500 block">Kategori<select value={kat} onChange={e=>setKat(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm"><option>Drivmedel</option><option>Parkering</option><option>Mat</option><option>Övrigt</option></select></label></div>
+    <label className="text-xs text-gray-500 block mb-3">Koppla till resa<select value={resaId} onChange={e=>setResaId(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm">{mina.map(r=><option key={r.id} value={r.id}>{dmKort(r.startTid)} · {r.startAdress.split(",")[0]} → {r.stoppAdress.split(",")[0]}</option>)}</select></label>
+    <button onClick={spara} disabled={!belopp} className="w-full py-3 rounded-xl font-bold text-[#0E1726] disabled:opacity-50" style={{background:"#C2F24D"}}>Spara utlägg</button>
+  </Card></div>);
+}
+function FelrapportModal({onClose,onSave}){
+  const [typ,setTyp]=useState("Varningslampa"); const [text,setText]=useState(""); const [bild,setBild]=useState(null);
+  const onFile=(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f)return; const rd=new FileReader(); rd.onload=()=>setBild(rd.result); rd.readAsDataURL(f); };
+  return (<div className="fixed inset-0 bg-black/50 z-[2300] flex items-center justify-center p-4" onClick={onClose}><Card className="w-[420px] max-w-full p-5" onClick={e=>e.stopPropagation()}>
+    <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-lg">Rapportera fel</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button></div>
+    <label className="text-xs text-gray-500 block mb-2">Typ<select value={typ} onChange={e=>setTyp(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm"><option>Varningslampa</option><option>Skada / buckla</option><option>Däck / punktering</option><option>Övrigt</option></select></label>
+    <label className="text-xs text-gray-500 block mb-2">Beskrivning<textarea value={text} onChange={e=>setText(e.target.value)} rows="3" placeholder="Vad har hänt?" className="w-full border rounded px-2 py-1.5 text-sm"/></label>
+    <label className="block border-2 border-dashed rounded-xl p-3 text-center text-sm text-gray-500 cursor-pointer mb-3">{bild?<img src={bild} alt="fel" className="max-h-32 mx-auto rounded"/>:<span>📷 Bifoga foto (valfritt)</span>}<input type="file" accept="image/*" capture="environment" onChange={onFile} className="hidden"/></label>
+    <button onClick={()=>onSave({id:"f"+Date.now(),typ,text,harBild:!!bild,datum:new Date().toISOString()})} className="w-full py-3 rounded-xl font-bold text-white" style={{background:"#0E1726"}}>Skicka till admin</button>
+  </Card></div>);
+}
+function BilKartaModal({lat,lng,adress,onClose}){
+  const ref=useRef();
+  useEffect(()=>{ const m=L.map(ref.current).setView([lat,lng],15); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(m); L.marker([lat,lng]).addTo(m).bindPopup(adress).openPopup(); const t=setTimeout(()=>m.invalidateSize(),250); return ()=>{ clearTimeout(t); m.remove(); }; },[]);
+  return (<div className="fixed inset-0 bg-black/50 z-[2300] flex items-center justify-center p-4" onClick={onClose}><Card className="w-[600px] max-w-full overflow-hidden" onClick={e=>e.stopPropagation()}><div className="flex items-center justify-between p-4 border-b"><div><div className="font-bold">Var står bilen?</div><div className="text-xs text-gray-500">{adress}</div></div><button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button></div><div ref={ref} style={{height:380}}></div></Card></div>);
+}
+
 function ForarVy({driver,resor,setResor}){
   const mina=resor.filter(r=>r.forareId===driver.id).sort((a,b)=>b.startTid-a.startTid);
-  const tjmil=Math.round(mina.filter(r=>r.resetyp==="Tjänsteresa").reduce((s,r)=>s+r.avstandKm,0)/10*10)/10;
-  const ers=Math.round(tjmil*25);
-  const attKlassa=mina.filter(r=>!r.klassad);
-  const klassa=(id,typ)=>setResor(rs=>rs.map(r=>r.id===id?{...r,resetyp:typ,klassad:true,resesyfte:r.resesyfte||(typ==="Tjänsteresa"?"Tjänsteärende":"Privat resa")}:r));
   const fnamn=driver.namn.split(" ")[0];
-  return (<div className="space-y-5">
-    <div className="rounded-xl p-3 text-sm flex items-center gap-2" style={{background:"#EEF1FF"}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#2F4BFF" strokeWidth="2"/><path d="M12 8v5" stroke="#2F4BFF" strokeWidth="2" strokeLinecap="round"/><circle cx="12" cy="16" r="1.1" fill="#2F4BFF"/></svg><span className="text-[#22356B]">Du är inloggad som <strong>förare</strong> – du ser och klassar bara dina egna körningar.</span></div>
-    <div><div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#8A93A0] mb-1">Mina körningar · juni 2026</div><h1 className="text-[26px] font-extrabold leading-none">Hej {fnamn}</h1></div>
-    <div className="grid grid-cols-3 gap-3"><Kpi label="Mina tjänstemil" value={tjmil}/><Kpi label="Min ersättning" value={kr(ers)} suffix="kr"/><Kpi label="Att klassa" value={attKlassa.length} accent={attKlassa.length?"text-[#2F4BFF]":"text-green-600"}/></div>
-    <Card className="overflow-hidden"><div className="px-4 py-2 bg-gray-50 border-b text-sm font-semibold text-gray-700">Klassa dina resor</div>
-      <div className="divide-y">{mina.map(r=>(<div key={r.id} className={"p-3 flex items-center justify-between gap-3 flex-wrap "+(r.klassad?"bg-green-50/40":"")}>
-        <div className="min-w-0"><div className="text-sm font-medium">{r.startAdress.split(",")[0]} → {r.stoppAdress.split(",")[0]}</div><div className="text-xs text-gray-400">{fmtKlock(r.startTid)} · {r.avstandKm} km · {r.fordonRegNr}</div></div>
-        {r.klassad ? <Badge color={r.resetyp==="Tjänsteresa"?"gron":"gra"}>{r.resetyp}</Badge> :
-          <div className="flex gap-2"><button onClick={()=>klassa(r.id,"Privatresa")} className="px-4 py-2 rounded-lg border text-sm font-medium">Privat</button><button onClick={()=>klassa(r.id,"Tjänsteresa")} className="px-4 py-2 rounded-lg text-sm font-medium" style={{background:"#C2F24D",color:"#0E1726"}}>Tjänst</button></div>}
-      </div>))}{mina.length===0&&<div className="p-6 text-center text-gray-400">Inga körningar.</div>}</div></Card>
-    <div className="text-xs text-gray-400">Export och flottvyer hanteras av din administratör – inte tillgängligt för förare.</div>
+  const ko=mina.filter(r=>!r.klassad);
+  const klassadeN=mina.length-ko.length;
+  const tjmil=Math.round(mina.filter(r=>r.resetyp==="Tjänsteresa").reduce((s,r)=>s+r.avstandKm,0))/10;
+  const ers=Math.round(tjmil*25);
+  const dm=(t)=>(""+t.getDate()).padStart(2,"0")+"."+(""+(t.getMonth()+1)).padStart(2,"0");
+  const [minne,setMinne]=useState(()=>RUTTMINNE.load());
+  const [vy,setVy]=useState(()=>{ try{return localStorage.getItem("msp_forarvy");}catch(e){return null;} });
+  const [valjare,setValjare]=useState(false);
+  const [angra,setAngra]=useState(null); const angraT=useRef();
+  const [dx,setDx]=useState(0); const drag=useRef(null);
+  const [aiOv,setAiOv]=useState({});
+  const forslag=(r)=>klassForslag(r,minne);
+  const pickVy=(v)=>{ try{localStorage.setItem("msp_forarvy",v);}catch(e){} setVy(v); setValjare(false); };
+  const settUndo=(ids,extra)=>{ setAngra({ids,...extra}); clearTimeout(angraT.current); angraT.current=setTimeout(()=>setAngra(null),7000); };
+  const applyKlass=(ids,typ)=>{ setResor(rs=>rs.map(r=>ids.includes(r.id)?{...r,resetyp:typ,klassad:true,resesyfte:r.resesyfte||(typ==="Tjänsteresa"?(kalenderSyfte(r)||"Tjänsteärende"):"Privat resa")}:r)); };
+  const klassa=(id,typ)=>{
+    const r=mina.find(x=>x.id===id); if(!r)return; const key=ruttKey(r);
+    const nm={...minne,[key]:typ}; setMinne(nm); RUTTMINNE.save(nm);
+    const auto=mina.filter(x=>!x.klassad&&x.id!==id&&ruttKey(x)===key).map(x=>x.id);
+    applyKlass([id,...auto],typ); settUndo([id,...auto],{autoN:auto.length,key});
+  };
+  const bekraftaAlla=(par)=>{ const nm={...minne}; par.forEach(p=>{ const r=mina.find(x=>x.id===p.id); if(r)nm[ruttKey(r)]=p.typ; }); setMinne(nm); RUTTMINNE.save(nm);
+    const byT={}; par.forEach(p=>byT[p.typ]=[...(byT[p.typ]||[]),p.id]); Object.keys(byT).forEach(t=>applyKlass(byT[t],t)); settUndo(par.map(p=>p.id),{autoN:0}); setAiOv({}); };
+  const angraUndo=()=>{ if(!angra)return; const ids=angra.ids; setResor(rs=>rs.map(r=>ids.includes(r.id)?{...r,klassad:false}:r));
+    if(angra.key){ const nm={...minne}; delete nm[angra.key]; setMinne(nm); RUTTMINNE.save(nm); } setAngra(null); };
+  // autoklassa kända rutter (minne från tidigare sessioner) en gång
+  useEffect(()=>{ const known=mina.filter(r=>!r.klassad&&minne[ruttKey(r)]); if(!known.length)return; const byT={}; known.forEach(r=>{ const t=minne[ruttKey(r)]; byT[t]=[...(byT[t]||[]),r.id]; }); Object.keys(byT).forEach(t=>applyKlass(byT[t],t)); settUndo(known.map(r=>r.id),{autoN:known.length,known:true}); },[]);
+
+  // ---- nya förarfunktioner ----
+  const [ftab,setFtab]=useState("klassa");
+  const [platser,setPlatser]=useState(()=>LSS.load("msp_platser",{}));
+  const [utlagg,setUtlagg]=useState(()=>LSS.load("msp_utlagg",[]));
+  const [felrap,setFelrap]=useState(()=>LSS.load("msp_felrap",[]));
+  const [notisPa,setNotisPa]=useState(()=>LSS.load("msp_notis",false));
+  const [reseslutPa,setReseslutPa]=useState(()=>LSS.load("msp_reseslut",false));
+  const [morkt,setMorkt]=useState(()=>LSS.load("msp_morkt",false));
+  const [sprak,setSprak]=useState(()=>LSS.load("msp_sprak","sv"));
+  const [kvittoOpen,setKvittoOpen]=useState(false); const [felOpen,setFelOpen]=useState(false); const [bilOpen,setBilOpen]=useState(false);
+  const [online,setOnline]=useState(()=>typeof navigator==="undefined"||navigator.onLine);
+  const [nyPlatsAdr,setNyPlatsAdr]=useState(""); const [nyPlatsNamn,setNyPlatsNamn]=useState("");
+  const [flash,setFlash]=useState("");
+  const visa=(m)=>{ setFlash(m); setTimeout(()=>setFlash(""),2600); };
+  useEffect(()=>{ const on=()=>setOnline(true), off=()=>setOnline(false); window.addEventListener("online",on); window.addEventListener("offline",off); return ()=>{ window.removeEventListener("online",on); window.removeEventListener("offline",off); }; },[]);
+  useEffect(()=>{ LSS.save("msp_platser",platser); },[platser]);
+  useEffect(()=>{ LSS.save("msp_utlagg",utlagg); },[utlagg]);
+  useEffect(()=>{ LSS.save("msp_felrap",felrap); },[felrap]);
+  useEffect(()=>{ LSS.save("msp_notis",notisPa); },[notisPa]);
+  useEffect(()=>{ LSS.save("msp_reseslut",reseslutPa); },[reseslutPa]);
+  useEffect(()=>{ LSS.save("msp_morkt",morkt); },[morkt]);
+  useEffect(()=>{ LSS.save("msp_sprak",sprak); },[sprak]);
+  useEffect(()=>{ if(notisPa&&Notis.ok()&&ko.length>0) Notis.skicka("Milvy",ko.length+" resor att klassa"); },[]);
+  MILVY_PLATSER=platser;
+  const T=(sv,en)=>sprak==="en"?en:sv;
+  const platsNamn=(adr)=>{ const k=adr.split(",")[0]; return platser[k]||k; };
+  const veckaResor=mina.filter(r=>(Date.now()-r.startTid)<7*864e5);
+  const veckaKm=Math.round(veckaResor.reduce((s,r)=>s+r.avstandKm,0));
+  const veckaErs=Math.round(veckaResor.filter(r=>r.resetyp==="Tjänsteresa").reduce((s,r)=>s+r.avstandKm,0)/10*25);
+  const sista=mina[0];
+  const anomalier=detekteraAvvikelser(mina).slice(0,3);
+  const minEco=ecoScores(resor).find(e=>e.driver.id===driver.id);
+  const utlSum=utlagg.reduce((s,u)=>s+u.belopp,0);
+  const sparaUtlagg=(u)=>{ setUtlagg(x=>[u,...x]); setKvittoOpen(false); visa(T("Utlägg sparat ✓","Expense saved ✓")); };
+  const sparaFel=(f)=>{ setFelrap(x=>[f,...x]); setFelOpen(false); visa(T("Felrapport skickad till admin ✓","Report sent ✓")); if(Notis.ok())Notis.skicka("Milvy","Felrapport skickad: "+f.typ); };
+  const laggPlats=()=>{ if(!nyPlatsAdr.trim()||!nyPlatsNamn.trim())return; setPlatser(p=>({...p,[nyPlatsAdr.trim()]:nyPlatsNamn.trim()})); setNyPlatsAdr(""); setNyPlatsNamn(""); };
+  const slaPaNotis=async()=>{ const ok=await Notis.be(); setNotisPa(ok); visa(ok?T("Notiser på ✓","Notifications on ✓"):T("Notiser nekades i webbläsaren","Notifications blocked")); if(ok)Notis.skicka("Milvy",T("Du får nu påminnelser om oklassade resor.","You'll get reminders for unclassified trips.")); };
+
+  const FB="rounded-xl p-3 text-sm flex items-center gap-2";
+  const Toggle=({on,set})=>(<button onClick={set} className={"w-11 h-6 rounded-full relative transition shrink-0 "+(on?"bg-[#2F4BFF]":"bg-gray-300")}><span className={"absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all "+(on?"left-[22px]":"left-0.5")}></span></button>);
+  const SRow=({label,desc,right})=>(<div className="flex items-center justify-between p-3 gap-3"><div className="min-w-0"><div className="text-sm font-medium">{label}</div>{desc&&<div className="text-xs text-gray-400">{desc}</div>}</div>{right}</div>);
+  const tabs=[["klassa",T("Klassa","Classify"),"M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2",ko.length],["utlagg",T("Utlägg","Expenses"),"M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2M21 12H9m0 0l3-3m-3 3l3 3",0],["bil",T("Min bil","My car"),"M3 13l2-5a2 2 0 012-1h6a2 2 0 012 1l2 5M5 13h10M6 16h.01M14 16h.01M5 13v3M15 13v3",0],["profil",T("Profil","Profile"),"M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",0]];
+
+  const klassaInnehall=(ko.length===0 ? <Card className="p-8 text-center"><div className="text-3xl mb-1">✓</div><div className="font-semibold">{T("Allt klassat!","All done!")}</div><div className="text-sm text-gray-500">{T("Inga oklassade körningar kvar just nu.","No unclassified trips right now.")}</div></Card> :
+     vy==="knappar" ? (()=>{ const r=ko[0], f=forslag(r); return (<div>
+       <div className="flex items-center gap-3 mb-3"><div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-[#0E1726]" style={{width:(klassadeN/Math.max(1,mina.length)*100)+"%"}}></div></div><span className="text-xs font-mono text-gray-400">{klassadeN}/{mina.length}</span></div>
+       <Card className="p-5 rounded-2xl border-2"><ResaKort r={r} dm={dm}/></Card>
+       <div className="mt-3 flex items-center justify-center gap-1.5 text-xs"><span className="text-[#2F4BFF] font-semibold">✦ AI föreslår {f.typ==="Tjänsteresa"?"Tjänst":"Privat"}</span><span className="text-gray-400">· {f.kand?"känd rutt":Math.round(f.konf*100)+"%"}</span></div>
+       <div className="grid grid-cols-2 gap-3 mt-2">
+         <button onClick={()=>klassa(r.id,"Privatresa")} className={"py-4 rounded-xl border-2 font-bold "+(f.typ==="Privatresa"?"border-[#2F4BFF] ring-2 ring-[#2F4BFF]/20":"border-gray-200 hover:border-gray-300")}>Privat<div className="text-[11px] font-mono font-normal text-gray-400">hem / ärende</div></button>
+         <button onClick={()=>klassa(r.id,"Tjänsteresa")} className={"py-4 rounded-xl font-bold "+(f.typ==="Tjänsteresa"?"ring-2 ring-[#2F4BFF]":"")} style={{background:"#C2F24D",color:"#0E1726"}}>Tjänst<div className="text-[11px] font-mono font-normal">arbete</div></button>
+       </div></div>); })() :
+     vy==="svep" ? (()=>{ const r=ko[0], f=forslag(r); const end=()=>{ const d=dx; setDx(0); drag.current=null; if(d>110)klassa(r.id,"Tjänsteresa"); else if(d<-110)klassa(r.id,"Privatresa"); }; return (<div>
+       <div className="flex items-center gap-3 mb-3"><div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-[#0E1726]" style={{width:(klassadeN/Math.max(1,mina.length)*100)+"%"}}></div></div><span className="text-xs font-mono text-gray-400">{klassadeN}/{mina.length}</span></div>
+       <div className="relative h-[340px] select-none" onPointerDown={e=>{drag.current=e.clientX;}} onPointerMove={e=>{ if(drag.current!=null)setDx(e.clientX-drag.current); }} onPointerUp={end} onPointerLeave={()=>{ if(drag.current!=null)end(); }}>
+         <div className="absolute inset-0 flex items-center justify-between px-4 text-sm font-bold pointer-events-none"><span className={dx<-40?"text-[#2F4BFF]":"text-gray-300"}>← Privat</span><span className={dx>40?"text-green-700":"text-gray-300"}>Tjänst →</span></div>
+         <Card className="absolute inset-x-6 top-0 p-5 rounded-2xl border-2 cursor-grab active:cursor-grabbing" style={{transform:"translateX("+dx+"px) rotate("+(dx/30)+"deg)",transition:drag.current==null?"transform .25s ease":"none",borderColor:dx>40?"#84cc16":dx<-40?"#2F4BFF":"#0E1726"}}><ResaKort r={r} dm={dm}/></Card>
+       </div>
+       <div className="mt-2 text-center text-xs"><span className="text-[#2F4BFF] font-semibold">✦ AI: {f.typ==="Tjänsteresa"?"Tjänst":"Privat"}</span> <span className="text-gray-400">· svep eller tryck</span></div>
+       <div className="grid grid-cols-2 gap-3 mt-2"><button onClick={()=>klassa(r.id,"Privatresa")} className={"py-3 rounded-xl border-2 font-bold "+(f.typ==="Privatresa"?"border-[#2F4BFF]":"border-gray-200")}>← Privat</button><button onClick={()=>klassa(r.id,"Tjänsteresa")} className={"py-3 rounded-xl font-bold "+(f.typ==="Tjänsteresa"?"ring-2 ring-[#2F4BFF]":"")} style={{background:"#C2F24D",color:"#0E1726"}}>Tjänst →</button></div>
+     </div>); })() :
+     vy==="ai" ? (()=>{ const items=ko.map(r=>({r,f:forslag(r)})); const typFor=(it)=>aiOv[it.r.id]||it.f.typ; const auto=items.filter(it=>it.f.kand||it.f.konf>=0.8).length; return (<div>
+       <div className="rounded-2xl p-4 mb-3 text-white flex items-center gap-3" style={{background:"#0E1726"}}><span className="w-9 h-9 rounded-full grid place-items-center text-[#0E1726] font-bold" style={{background:"#C2F24D"}}>✦</span><div><div className="font-bold text-sm">AI föreslog {auto} av {items.length} med hög säkerhet</div><div className="text-xs text-[#8FA0B8]">Tryck på en rad för att vända · kända rutter är redan klara</div></div></div>
+       <div className="space-y-2">{items.map(it=>{ const t=typFor(it); const low=!it.f.kand&&it.f.konf<0.8; return (
+         <button key={it.r.id} onClick={()=>setAiOv(o=>({...o,[it.r.id]:t==="Tjänsteresa"?"Privatresa":"Tjänsteresa"}))} className={"w-full text-left p-3 rounded-xl border-2 "+(low?"border-[#2F4BFF]":"border-gray-200 hover:border-gray-300")}>
+           <div className="flex items-center justify-between gap-2"><div className="font-semibold text-sm truncate">{it.r.startAdress.split(",")[0]} → {it.r.stoppAdress.split(",")[0]}</div><Badge color={t==="Tjänsteresa"?"gron":"gra"}>{t==="Tjänsteresa"?"TJÄNST":"PRIVAT"}</Badge></div>
+           <div className="flex items-center justify-between text-xs text-gray-400 mt-0.5"><span>{dm(it.r.startTid)} · {(it.r.avstandKm/10).toFixed(1)} mil</span><span className={low?"text-[#2F4BFF] font-semibold":""}>{it.f.kand?"Känd rutt":(low?"Kontrollera ":"AI ")+Math.round(it.f.konf*100)+"%"}</span></div>
+         </button>); })}</div>
+       <button onClick={()=>bekraftaAlla(items.map(it=>({id:it.r.id,typ:typFor(it)})))} className="w-full mt-3 py-4 rounded-2xl font-bold text-[#0E1726]" style={{background:"#C2F24D"}}>✓ Bekräfta alla ({items.length})</button>
+     </div>); })() :
+     (<Card className="overflow-hidden"><div className="px-4 py-2 bg-gray-50 border-b text-sm font-semibold text-gray-700">Klassa dina resor</div>
+       <div className="divide-y">{mina.map(r=>{ const f=!r.klassad&&forslag(r); return (<div key={r.id} className={"p-3 flex items-center justify-between gap-3 flex-wrap "+(r.klassad?"bg-green-50/40":"")}>
+         <div className="min-w-0"><div className="text-sm font-medium">{r.startAdress.split(",")[0]} → {r.stoppAdress.split(",")[0]}</div><div className="text-xs text-gray-400">{fmtKlock(r.startTid)} · {r.avstandKm} km · {r.fordonRegNr}{f?<span className="text-[#2F4BFF]"> · ✦ {f.typ==="Tjänsteresa"?"Tjänst":"Privat"} {f.kand?"(känd)":Math.round(f.konf*100)+"%"}</span>:""}</div></div>
+         {r.klassad ? <Badge color={r.resetyp==="Tjänsteresa"?"gron":"gra"}>{r.resetyp}</Badge> :
+           <div className="flex gap-2"><button onClick={()=>klassa(r.id,"Privatresa")} className={"px-4 py-2 rounded-lg border text-sm font-medium "+(f.typ==="Privatresa"?"border-[#2F4BFF] text-[#2F4BFF]":"")}>Privat</button><button onClick={()=>klassa(r.id,"Tjänsteresa")} className={"px-4 py-2 rounded-lg text-sm font-medium "+(f.typ==="Tjänsteresa"?"ring-2 ring-[#2F4BFF]":"")} style={{background:"#C2F24D",color:"#0E1726"}}>Tjänst</button></div>}
+       </div>); })}{mina.length===0&&<div className="p-6 text-center text-gray-400">Inga körningar.</div>}</div></Card>));
+
+  return (<div className={morkt?"df-dark":""} style={morkt?{background:"#0E1726",minHeight:"100vh",margin:"-24px -16px",padding:"24px 16px 120px"}:undefined}>
+    {morkt&&<style>{".df-dark .bg-white{background:#16233A!important;color:#E7ECF3}.df-dark .card{background:#16233A!important;border-color:#2a3550!important}.df-dark .bg-gray-50{background:#1b2942!important}.df-dark .bg-gray-100{background:#243352!important}.df-dark .text-gray-800,.df-dark .text-gray-700,.df-dark .text-gray-600{color:#cbd5e1!important}.df-dark .text-gray-500,.df-dark .text-gray-400{color:#8FA0B8!important}.df-dark .border,.df-dark .border-2,.df-dark .border-b,.df-dark .border-t{border-color:#2a3550!important}.df-dark h1,.df-dark h2{color:#fff}"}</style>}
+    {(!vy||valjare)&&<VyValjare current={vy} first={!vy} onClose={()=>setValjare(false)} onPick={pickVy}/>}
+    {kvittoOpen&&<KvittoModal resor={resor} driver={driver} onClose={()=>setKvittoOpen(false)} onSave={sparaUtlagg}/>}
+    {felOpen&&<FelrapportModal onClose={()=>setFelOpen(false)} onSave={sparaFel}/>}
+    {bilOpen&&sista&&<BilKartaModal lat={sista.stoppLat} lng={sista.stoppLng} adress={platsNamn(sista.stoppAdress)} onClose={()=>setBilOpen(false)}/>}
+    <div className="space-y-5 pb-24">
+      <div className={FB} style={{background:"#EEF1FF"}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#2F4BFF" strokeWidth="2"/><path d="M12 8v5" stroke="#2F4BFF" strokeWidth="2" strokeLinecap="round"/><circle cx="12" cy="16" r="1.1" fill="#2F4BFF"/></svg><span className="text-[#22356B]">{T("Du är inloggad som ","Logged in as ")}<strong>{T("förare","driver")}</strong>{T(" – du ser och klassar bara dina egna körningar.",". You only see and classify your own trips.")}</span></div>
+      {!online&&<div className={FB} style={{background:"#FEF3C7"}}><span>📴</span><span className="text-[#92400E]">{T("Offline – dina ändringar sparas och synkas när du är uppkopplad igen.","Offline – your changes are saved and will sync when you're back online.")}</span></div>}
+      <div className="flex items-end justify-between gap-3">
+        <div><div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#8A93A0] mb-1">{T("Mina körningar · juni 2026","My trips · June 2026")}</div><h1 className="text-[26px] font-extrabold leading-none">{T("Hej","Hi")} {fnamn}</h1></div>
+        {ftab==="klassa"&&<button onClick={()=>setValjare(true)} className="shrink-0 flex items-center gap-1.5 text-xs font-medium border rounded-lg px-2.5 py-1.5 text-gray-600 hover:text-[#0E1726]"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/></svg>{T("Vy","View")}: {vy?VY_INFO[vy][0]:T("välj","pick")}</button>}
+      </div>
+      {(ftab==="klassa"||ftab==="bil")&&<div className="grid grid-cols-3 gap-3"><Kpi label={T("Mina tjänstemil","My business mil")} value={tjmil}/><Kpi label={T("Min ersättning","My reimbursement")} value={kr(ers)} suffix="kr"/><Kpi label={T("Att klassa","To classify")} value={ko.length} accent={ko.length?"text-[#2F4BFF]":"text-green-600"}/></div>}
+
+      {ftab==="klassa"&&<React.Fragment>
+        {anomalier.length>0&&<Card className="p-3 border-amber-200 text-sm" style={{background:"#FFFBEB"}}><span className="text-amber-800">⚠ {anomalier.length} {T("av dina resor ser ovanliga ut (t.ex. ovanligt lång eller snabb) – kontrollera dem när du klassar.","of your trips look unusual – double-check them while classifying.")}</span></Card>}
+        {klassaInnehall}
+        <div className="text-xs text-gray-400">{T("Export och flottvyer hanteras av din administratör.","Export and fleet views are handled by your admin.")}</div>
+      </React.Fragment>}
+
+      {ftab==="utlagg"&&<div className="space-y-3">
+        <h2 className="font-bold text-lg">{T("Utlägg & rapport","Expenses & report")}</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={()=>setKvittoOpen(true)} className="p-4 rounded-xl border-2 border-dashed text-left hover:border-[#2F4BFF]"><div className="text-2xl">📷</div><div className="font-semibold text-sm mt-1">{T("Fota kvitto","Scan receipt")}</div><div className="text-xs text-gray-500">{T("AI läser av beloppet","AI reads the amount")}</div></button>
+          <button onClick={()=>setFelOpen(true)} className="p-4 rounded-xl border-2 border-dashed text-left hover:border-[#2F4BFF]"><div className="text-2xl">🛠️</div><div className="font-semibold text-sm mt-1">{T("Rapportera fel","Report issue")}</div><div className="text-xs text-gray-500">{T("Skada / varningslampa → admin","Damage / warning → admin")}</div></button>
+        </div>
+        <Card className="p-4"><div className="flex items-center justify-between mb-1"><div className="font-semibold">{T("Reseräkning","Mileage report")}</div><span className="text-xs text-gray-400">juni 2026</span></div>
+          <div className="text-sm text-gray-500 mb-3">{tjmil} mil · {kr(ers)} kr {T("ersättning","reimb.")} · {utlagg.length} {T("utlägg","expenses")} ({kr(Math.round(utlSum))} kr)</div>
+          <button onClick={()=>reserakningPDF(driver,mina.filter(r=>r.resetyp==="Tjänsteresa"),utlagg,tjmil,ers)} className="w-full py-2.5 rounded-lg font-semibold text-white" style={{background:"#0E1726"}}>{T("Skapa PDF-underlag","Create PDF")}</button></Card>
+        <Card className="overflow-hidden"><div className="px-4 py-2 bg-gray-50 border-b text-sm font-semibold text-gray-700">{T("Mina utlägg","My expenses")}</div>
+          <div className="divide-y">{utlagg.length===0?<div className="p-5 text-center text-sm text-gray-400">{T("Inga utlägg än. Fota ditt första kvitto!","No expenses yet. Scan your first receipt!")}</div>:utlagg.map(u=>(<div key={u.id} className="p-3 flex items-center justify-between text-sm"><div><div className="font-medium">{u.kategori}</div><div className="text-xs text-gray-400">{new Date(u.datum).toLocaleDateString("sv-SE")}</div></div><div className="flex items-center gap-3"><span className="font-mono font-semibold">{u.belopp.toFixed(2)} kr</span><button onClick={()=>setUtlagg(x=>x.filter(y=>y.id!==u.id))} className="text-gray-300 hover:text-red-500">✕</button></div></div>))}</div></Card>
+        {felrap.length>0&&<Card className="overflow-hidden"><div className="px-4 py-2 bg-gray-50 border-b text-sm font-semibold text-gray-700">{T("Skickade felrapporter","Sent reports")}</div><div className="divide-y">{felrap.map(f=>(<div key={f.id} className="p-3 text-sm"><div className="font-medium">{f.typ}</div><div className="text-xs text-gray-400">{f.text||"—"} · {new Date(f.datum).toLocaleDateString("sv-SE")}</div></div>))}</div></Card>}
+      </div>}
+
+      {ftab==="bil"&&<div className="space-y-3">
+        <h2 className="font-bold text-lg">{T("Min bil","My car")}</h2>
+        {sista&&<Card className="p-4"><div className="flex items-center justify-between gap-3"><div className="min-w-0"><div className="text-[10px] font-mono uppercase text-gray-400">{T("Senast parkerad","Last parked")}</div><div className="font-semibold truncate">{platsNamn(sista.stoppAdress)}</div><div className="text-xs text-gray-400">{dmKort(sista.stoppTid)} {fmtTid(sista.stoppTid)} · {sista.fordonRegNr}</div></div><button onClick={()=>setBilOpen(true)} className="px-3 py-2 rounded-lg text-sm font-medium shrink-0" style={{background:"#C2F24D",color:"#0E1726"}}>{T("Visa på karta","Map")}</button></div></Card>}
+        <Card className="p-4"><div className="font-semibold mb-2">{T("Den här veckan","This week")}</div><div className="grid grid-cols-3 gap-3 text-center"><div><div className="text-2xl font-mono font-bold">{veckaResor.length}</div><div className="text-[10px] font-mono uppercase text-gray-400">{T("Resor","Trips")}</div></div><div><div className="text-2xl font-mono font-bold">{veckaKm}</div><div className="text-[10px] font-mono uppercase text-gray-400">km</div></div><div><div className="text-2xl font-mono font-bold">{kr(veckaErs)}</div><div className="text-[10px] font-mono uppercase text-gray-400">kr {T("ers.","reimb.")}</div></div></div>{notisPa&&<button onClick={()=>{Notis.skicka("Milvy",veckaResor.length+" resor · "+veckaKm+" km · "+veckaErs+" kr"); visa(T("Veckosummering skickad ✓","Weekly summary sent ✓"));}} className="w-full mt-3 text-xs text-[#2F4BFF] hover:underline">{T("Skicka som notis","Send as notification")}</button>}</Card>
+        {minEco&&<Card className="p-4"><div className="flex items-center justify-between mb-2"><div className="font-semibold">{T("Min körstil","My eco-score")}</div><div className={"text-2xl font-mono font-bold "+(minEco.score>=80?"text-green-600":minEco.score>=60?"text-amber-600":"text-red-600")}>{minEco.score}<span className="text-sm text-gray-400">/100</span></div></div><div className="w-full bg-gray-100 rounded-full h-2 mb-2"><div className={"h-2 rounded-full "+(minEco.score>=80?"bg-green-500":minEco.score>=60?"bg-amber-500":"bg-red-500")} style={{width:minEco.score+"%"}}></div></div><ul className="text-sm text-gray-600 space-y-1">{minEco.tips.map((t,i)=>(<li key={i} className="flex gap-1.5"><span className="text-[#2F4BFF]">•</span>{t}</li>))}</ul></Card>}
+        <Card className="p-4"><div className="font-semibold mb-2">{T("Boka tjänstebil","Book a car")}</div><div className="text-sm text-gray-500 mb-2">{T("Lediga bilar i bilpoolen:","Available pool cars:")}</div><div className="space-y-2">{FORDON.slice(0,3).map(v=>(<div key={v.id} className="flex items-center justify-between p-2 rounded-lg border text-sm"><div className="min-w-0 truncate"><span className="font-medium">{v.regNr}</span> <span className="text-gray-400">{v.fabrikat} {v.modell}</span></div><button onClick={()=>{ if(Notis.ok())Notis.skicka("Milvy","Bokningsförfrågan skickad för "+v.regNr); visa(T("Bokningsförfrågan skickad till admin ✓","Booking request sent ✓")); }} className="px-3 py-1.5 rounded-lg text-xs font-medium shrink-0" style={{background:"#C2F24D",color:"#0E1726"}}>{T("Boka","Book")}</button></div>))}</div></Card>
+      </div>}
+
+      {ftab==="profil"&&<div className="space-y-3">
+        <h2 className="font-bold text-lg">{T("Profil & inställningar","Profile & settings")}</h2>
+        <Card className="p-4 flex items-center gap-3"><div className="w-12 h-12 rounded-full grid place-items-center font-bold text-[#0E1726]" style={{background:"#C2F24D"}}>{driver.namn.split(" ").map(s=>s[0]).join("")}</div><div className="min-w-0"><div className="font-semibold">{driver.namn}</div><div className="text-xs text-gray-400 truncate">{T("Förare","Driver")} · {driver.epost||"forare@milvy.se"}</div></div></Card>
+        <Card className="divide-y">
+          <SRow label={T("Klass-vy","Classify view")} desc={vy?VY_INFO[vy][0]:T("ej vald","not set")} right={<button onClick={()=>setValjare(true)} className="text-sm font-medium text-[#2F4BFF]">{T("Byt","Change")}</button>}/>
+          <SRow label={T("Notiser om oklassade resor","Reminders for unclassified trips")} desc={T("Push när det finns resor att klassa","Push when trips need classifying")} right={<Toggle on={notisPa} set={()=>{ if(notisPa)setNotisPa(false); else slaPaNotis(); }}/>}/>
+          <SRow label={T("Påminn när en resa avslutas","Remind me when a trip ends")} desc={T("„Klassa nu?” direkt vid reseslut","Prompt to classify right after a trip")} right={<Toggle on={reseslutPa} set={()=>setReseslutPa(v=>!v)}/>}/>
+          <SRow label={T("Mörkt läge","Dark mode")} right={<Toggle on={morkt} set={()=>setMorkt(v=>!v)}/>}/>
+          <SRow label={T("Språk","Language")} right={<select value={sprak} onChange={e=>setSprak(e.target.value)} className="border rounded px-2 py-1 text-sm"><option value="sv">Svenska</option><option value="en">English</option></select>}/>
+        </Card>
+        <Card className="p-4"><div className="font-semibold mb-1">{T("Favoritplatser","Favorite places")}</div><div className="text-xs text-gray-500 mb-3">{T("Döp adresser så journalen blir tydligare och AI:n gissar bättre.","Name addresses for a clearer log and better AI guesses.")}</div>
+          <div className="space-y-2 mb-3">{Object.keys(platser).length===0?<div className="text-sm text-gray-400">{T("Inga sparade platser.","No saved places.")}</div>:Object.keys(platser).map(a=>(<div key={a} className="flex items-center justify-between text-sm p-2 rounded-lg border"><div className="min-w-0 truncate"><span className="font-medium">{platser[a]}</span> <span className="text-gray-400">{a}</span></div><button onClick={()=>setPlatser(p=>{const x={...p}; delete x[a]; return x;})} className="text-gray-300 hover:text-red-500 shrink-0">✕</button></div>))}</div>
+          <div className="grid grid-cols-2 gap-2"><input value={nyPlatsNamn} onChange={e=>setNyPlatsNamn(e.target.value)} placeholder={T("Namn (t.ex. Hem)","Name (e.g. Home)")} className="border rounded px-2 py-1.5 text-sm"/><input value={nyPlatsAdr} onChange={e=>setNyPlatsAdr(e.target.value)} placeholder={T("Adress","Address")} list="mina-adresser" className="border rounded px-2 py-1.5 text-sm"/></div>
+          <datalist id="mina-adresser">{Array.from(new Set(mina.flatMap(r=>[r.startAdress.split(",")[0],r.stoppAdress.split(",")[0]]))).map(a=><option key={a} value={a}/>)}</datalist>
+          <button onClick={laggPlats} className="w-full mt-2 py-2 rounded-lg text-sm font-semibold border">{T("Lägg till plats","Add place")}</button></Card>
+        <Card className="p-4"><div className="font-semibold mb-1">{T("Genvägar & widget","Shortcuts & widget")}</div><div className="text-sm text-gray-500">{T("I mobilappen kan du lägga Milvy som widget på hemskärmen och säga „Hej Siri, klassa senaste resan som tjänst”.","In the mobile app you can add Milvy as a home-screen widget and say \"Hey Siri, classify my last trip as business\".")}</div><div className="flex gap-2 mt-3 flex-wrap"><span className="text-xs px-2 py-1 rounded-full bg-gray-100">📱 {T("Hemskärms-widget","Home widget")}</span><span className="text-xs px-2 py-1 rounded-full bg-gray-100">🎙️ Siri / Google</span><span className="text-xs px-2 py-1 rounded-full bg-gray-100">⌚ {T("Klocka","Watch")}</span></div></Card>
+      </div>}
+    </div>
+
+    <div className="fixed bottom-0 inset-x-0 z-[1200] border-t bg-white">
+      <div className="max-w-[1180px] mx-auto flex">{tabs.map(([k,label,icon,badge])=>(
+        <button key={k} onClick={()=>setFtab(k)} className={"flex-1 flex flex-col items-center gap-0.5 py-2 relative "+(ftab===k?"text-[#0E1726]":"text-gray-400")}>
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={icon}/></svg>
+          <span className="text-[10px] font-medium">{label}</span>
+          {badge>0&&<span className="absolute top-1 right-[26%] min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold text-white grid place-items-center" style={{background:"#2F4BFF"}}>{badge}</span>}
+        </button>))}</div>
+    </div>
+
+    {angra&&<div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[2100] flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white" style={{background:"#0E1726"}}><span className="text-sm">✓ {T("Klassade","Classified")} {angra.ids.length} {angra.ids.length===1?T("resa","trip"):T("resor","trips")}{angra.known?T(" (kända rutter via AI)"," (known routes via AI)"):angra.autoN?" ("+angra.autoN+T(" liknande via AI)"," similar via AI)"):""}</span><button onClick={angraUndo} className="text-sm font-semibold" style={{color:"#C2F24D"}}>{T("Ångra","Undo")}</button></div>}
+    {flash&&<div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[2100] px-4 py-2.5 rounded-lg shadow-lg text-white text-sm" style={{background:"#16a34a"}}>{flash}</div>}
   </div>);
 }
 

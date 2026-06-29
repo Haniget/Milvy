@@ -1142,7 +1142,7 @@ function SkadeKarta(){
     issues.forEach(it=>{ if(it.lat==null||it.lng==null)return; const c=farg[it.status]||"#dc2626";
       const mk=L.circleMarker([it.lat,it.lng],{radius:9,color:c,fillColor:c,fillOpacity:0.85,weight:2}).addTo(m);
       const reg=(it.vehicles&&it.vehicles.reg_nr)||"", forare=(it.drivers&&it.drivers.namn)||"";
-      mk.bindPopup("<b>"+it.type+"</b><br>"+(it.description||"")+"<br>"+(it.address||"")+"<br>"+reg+" · "+forare+"<br><i>"+it.status+"</i>");
+      mk.bindPopup("<b>"+it.type+"</b><br>"+(it.description||"")+"<br>"+(it.address||"")+"<br>"+reg+" · "+forare+"<br><i>"+it.status+"</i>"+(it.photo_url?"<br><img src='"+it.photo_url+"' style='width:150px;border-radius:6px;margin-top:5px'/>":""));
       pts.push([it.lat,it.lng]); });
     if(pts.length) m.fitBounds(pts,{padding:[40,40]}); const t=setTimeout(()=>m.invalidateSize(),250); return ()=>{ clearTimeout(t); m.remove(); }; },[issues]);
   if(!SB.loggedIn()) return (<Card className="p-4 text-sm text-gray-500">📍 Anslut databasen (knappen högst upp) för att se förarnas inrapporterade skador på karta.</Card>);
@@ -1682,6 +1682,7 @@ const SB={
   remove(table,id){ return this._req("DELETE",table+"?id=eq."+id); },
   removeBy(table,filter){ return this._req("DELETE",table+"?"+filter); },
   listTrips(){ const c=this.cfg(); return this._req("GET","trips?select=*,vehicles(reg_nr)&driver_id=eq."+c.driverId+"&order=start_tid.desc&limit=300"); },
+  async uploadPhoto(dataUrl){ const c=this.cfg(); const res=await fetch(dataUrl); const blob=await res.blob(); const ext=((blob.type.split("/")[1])||"jpg").replace("jpeg","jpg"); const path=(c.driverId||"anon")+"/"+Date.now()+"-"+Math.random().toString(36).slice(2,8)+"."+ext; const r=await fetch(this.base()+"/storage/v1/object/milvy-photos/"+path,{method:"POST",headers:{apikey:c.anon,Authorization:"Bearer "+c.token,"Content-Type":blob.type||"image/jpeg"},body:blob}); if(!r.ok) throw new Error(await r.text()); return this.base()+"/storage/v1/object/public/milvy-photos/"+path; },
   listOrgTrips(){ return this._req("GET","trips?select=*,vehicles(reg_nr),drivers(namn)&order=start_tid.desc&limit=500"); },
   listIssues(){ return this._req("GET","vehicle_issues?select=*,vehicles(reg_nr),drivers(namn)&order=created_at.desc&limit=300"); },
   updateTrip(id,patch){ return this._req("PATCH","trips?id=eq."+id,patch); }
@@ -1701,7 +1702,7 @@ function KvittoModal({resor,driver,onClose,onSave}){
   const aiLas=async()=>{ if(!bild){ setInfo("Ta eller välj ett foto först."); return; } setBusy(true); setInfo("");
     try{ if(AI.available()){ const out=await AI.vision(bild,"Läs av kvittot. Returnera ENDAST JSON {belopp:number, kategori:'Drivmedel'|'Parkering'|'Mat'|'Övrigt'}.","Du läser svenska kvitton.",300); const j=extractJson(out); if(j){ if(j.belopp!=null)setBelopp(""+j.belopp); if(j.kategori)setKat(j.kategori); setInfo("✓ AI läste av kvittot."); } else setInfo("Kunde inte tolka – fyll i manuellt."); }
       else setInfo("Lägg till API-nyckel för AI-avläsning. Fyll i manuellt så länge."); }catch(e){ setInfo("AI-fel – fyll i manuellt."); } setBusy(false); };
-  const spara=()=>{ if(!belopp)return; onSave({id:"u"+Date.now(),belopp:Number(belopp),kategori:kat,resaId,harBild:!!bild,datum:new Date().toISOString()}); };
+  const spara=()=>{ if(!belopp)return; onSave({id:"u"+Date.now(),belopp:Number(belopp),kategori:kat,resaId,bild:bild,harBild:!!bild,datum:new Date().toISOString()}); };
   return (<div className="fixed inset-0 bg-black/50 z-[2300] flex items-center justify-center p-4" onClick={onClose}><Card className="w-[420px] max-w-full p-5" onClick={e=>e.stopPropagation()}>
     <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-lg">Nytt utlägg</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button></div>
     <label className="block border-2 border-dashed rounded-xl p-4 text-center text-sm text-gray-500 cursor-pointer mb-3">{bild?<img src={bild} alt="kvitto" className="max-h-40 mx-auto rounded"/>:<span>📷 Fota eller välj kvitto</span>}<input type="file" accept="image/*" capture="environment" onChange={onFile} className="hidden"/></label>
@@ -1735,7 +1736,7 @@ function FelrapportModal({onClose,onSave,defaultPos}){
     <div className="text-[11px] text-gray-400 mt-1">Tryck på kartan eller dra nålen för att markera exakt plats.</div>
     {adress&&<div className="text-xs text-gray-600 mt-1 mb-2 truncate">📍 {adress}</div>}
     <label className="block border-2 border-dashed rounded-xl p-3 text-center text-sm text-gray-500 cursor-pointer my-3">{bild?<img src={bild} alt="fel" className="max-h-32 mx-auto rounded"/>:<span>📷 Bifoga foto (valfritt)</span>}<input type="file" accept="image/*" capture="environment" onChange={onFile} className="hidden"/></label>
-    <button onClick={()=>onSave({id:"f"+Date.now(),typ,text,harBild:!!bild,datum:new Date().toISOString(),plats:{lat:pos.lat,lng:pos.lng,adress}})} className="w-full py-3 rounded-xl font-bold text-white" style={{background:"#0E1726"}}>Skicka till admin</button>
+    <button onClick={()=>onSave({id:"f"+Date.now(),typ,text,bild:bild,harBild:!!bild,datum:new Date().toISOString(),plats:{lat:pos.lat,lng:pos.lng,adress}})} className="w-full py-3 rounded-xl font-bold text-white" style={{background:"#0E1726"}}>Skicka till admin</button>
   </Card></div>);
 }
 function BilKartaModal({lat,lng,adress,onClose}){
@@ -1828,20 +1829,20 @@ function ForarVy({driver,resor,setResor}){
   const [sbUrl,setSbUrl]=useState(()=>SB.cfg().url||""); const [sbAnon,setSbAnon]=useState(()=>SB.cfg().anon||"");
   const [sbEmail,setSbEmail]=useState(()=>SB.cfg().email||""); const [sbPw,setSbPw]=useState(""); const [sbBusy,setSbBusy]=useState(false); const [sbMsg,setSbMsg]=useState("");
   const syncDown=async()=>{ if(!SB.loggedInDriver())return; try{
-    const ex=await SB.list("driver_expenses"); if(Array.isArray(ex)) setUtlagg(ex.map(r=>({id:r.id,belopp:Number(r.amount),kategori:r.category,datum:r.created_at,resaId:""})));
+    const ex=await SB.list("driver_expenses"); if(Array.isArray(ex)) setUtlagg(ex.map(r=>({id:r.id,belopp:Number(r.amount),kategori:r.category,datum:r.created_at,resaId:"",bild:r.receipt_url||null})));
     const pl=await SB.list("driver_places"); if(Array.isArray(pl)){ const m={}; pl.forEach(r=>m[r.address_key]=r.label); setPlatser(m); }
-    const is=await SB.list("vehicle_issues"); if(Array.isArray(is)) setFelrap(is.map(r=>({id:r.id,typ:r.type,text:r.description,datum:r.created_at,plats:r.lat!=null?{lat:Number(r.lat),lng:Number(r.lng),adress:r.address}:null})));
+    const is=await SB.list("vehicle_issues"); if(Array.isArray(is)) setFelrap(is.map(r=>({id:r.id,typ:r.type,text:r.description,datum:r.created_at,bild:r.photo_url||null,plats:r.lat!=null?{lat:Number(r.lat),lng:Number(r.lng),adress:r.address}:null})));
     try{ const tr=await SB.listTrips(); if(Array.isArray(tr)) setRealTrips(tr.map(mapTrip)); }catch(e){}
   }catch(e){} };
   useEffect(()=>{ syncDown(); },[]);
   const sbLoggaIn=async()=>{ setSbBusy(true); setSbMsg(""); SB.setCfg({...SB.cfg(),url:sbUrl.trim(),anon:sbAnon.trim()}); try{ await SB.signIn(sbEmail.trim(),sbPw); setSbPw(""); setSbVer(v=>v+1); await syncDown(); visa(T("Synkad mellan enheter ✓","Synced across devices ✓")); }catch(e){ setSbMsg(String(e.message||e).slice(0,220)); } setSbBusy(false); };
   const sbLoggaUt=()=>{ SB.signOut(); setSbVer(v=>v+1); visa(T("Utloggad – data sparas lokalt","Signed out – stored locally")); };
   const sparaUtlagg=async(u)=>{ setKvittoOpen(false); visa(T("Utlägg sparat ✓","Expense saved ✓"));
-    if(SB.loggedInDriver()){ try{ const row=await SB.insert("driver_expenses",{amount:u.belopp,category:u.kategori,note:null}); const rr=Array.isArray(row)?row[0]:row; setUtlagg(x=>[{id:rr.id,belopp:Number(rr.amount),kategori:rr.category,datum:rr.created_at,resaId:""},...x]); return; }catch(e){} }
+    if(SB.loggedInDriver()){ try{ let receipt_url=null; if(u.bild&&u.bild.startsWith("data:")){ try{ receipt_url=await SB.uploadPhoto(u.bild); }catch(e){} } const row=await SB.insert("driver_expenses",{amount:u.belopp,category:u.kategori,note:null,receipt_url}); const rr=Array.isArray(row)?row[0]:row; setUtlagg(x=>[{id:rr.id,belopp:Number(rr.amount),kategori:rr.category,datum:rr.created_at,resaId:"",bild:rr.receipt_url||receipt_url},...x]); return; }catch(e){} }
     setUtlagg(x=>[u,...x]); };
   const taUtlagg=(id)=>{ setUtlagg(x=>x.filter(y=>y.id!==id)); if(SB.loggedInDriver())SB.remove("driver_expenses",id).catch(()=>{}); };
   const sparaFel=async(f)=>{ setFelOpen(false); visa(T("Felrapport skickad till admin ✓","Report sent ✓")); if(Notis.ok())Notis.skicka("Milvy","Felrapport skickad: "+f.typ);
-    if(SB.loggedInDriver()){ try{ const ftyp=(f.typ==="Skada / buckla"||f.typ==="Krock / olycka")?"Skada":f.typ==="Däck / punktering"?"Däck":(f.typ==="Varningslampa"?"Varningslampa":"Övrigt"); const p=f.plats||{}; const row=await SB.insert("vehicle_issues",{type:ftyp,description:f.text,lat:p.lat,lng:p.lng,address:p.adress||null}); const rr=Array.isArray(row)?row[0]:row; setFelrap(x=>[{id:rr.id,typ:rr.type,text:rr.description,datum:rr.created_at,plats:rr.lat!=null?{lat:Number(rr.lat),lng:Number(rr.lng),adress:rr.address}:null},...x]); return; }catch(e){} }
+    if(SB.loggedInDriver()){ try{ const ftyp=(f.typ==="Skada / buckla"||f.typ==="Krock / olycka")?"Skada":f.typ==="Däck / punktering"?"Däck":(f.typ==="Varningslampa"?"Varningslampa":"Övrigt"); const p=f.plats||{}; let photo_url=null; if(f.bild&&f.bild.startsWith("data:")){ try{ photo_url=await SB.uploadPhoto(f.bild); }catch(e){} } const row=await SB.insert("vehicle_issues",{type:ftyp,description:f.text,lat:p.lat,lng:p.lng,address:p.adress||null,photo_url}); const rr=Array.isArray(row)?row[0]:row; setFelrap(x=>[{id:rr.id,typ:rr.type,text:rr.description,datum:rr.created_at,bild:rr.photo_url||photo_url,plats:rr.lat!=null?{lat:Number(rr.lat),lng:Number(rr.lng),adress:rr.address}:null},...x]); return; }catch(e){} }
     setFelrap(x=>[f,...x]); };
   const laggPlats=async()=>{ const a=nyPlatsAdr.trim(), n=nyPlatsNamn.trim(); if(!a||!n)return; setNyPlatsAdr(""); setNyPlatsNamn(""); setPlatser(p=>({...p,[a]:n}));
     if(SB.loggedInDriver()){ try{ await SB.insert("driver_places",{address_key:a,label:n}); }catch(e){} } };
@@ -1919,8 +1920,8 @@ function ForarVy({driver,resor,setResor}){
           <div className="text-sm text-gray-500 mb-3">{tjmil} mil · {kr(ers)} kr {T("ersättning","reimb.")} · {utlagg.length} {T("utlägg","expenses")} ({kr(Math.round(utlSum))} kr)</div>
           <button onClick={()=>reserakningPDF(driver,mina.filter(r=>r.resetyp==="Tjänsteresa"),utlagg,tjmil,ers)} className="w-full py-2.5 rounded-lg font-semibold text-white" style={{background:"#0E1726"}}>{T("Skapa PDF-underlag","Create PDF")}</button></Card>
         <Card className="overflow-hidden"><div className="px-4 py-2 bg-gray-50 border-b text-sm font-semibold text-gray-700">{T("Mina utlägg","My expenses")}</div>
-          <div className="divide-y">{utlagg.length===0?<div className="p-5 text-center text-sm text-gray-400">{T("Inga utlägg än. Fota ditt första kvitto!","No expenses yet. Scan your first receipt!")}</div>:utlagg.map(u=>(<div key={u.id} className="p-3 flex items-center justify-between text-sm"><div><div className="font-medium">{u.kategori}</div><div className="text-xs text-gray-400">{new Date(u.datum).toLocaleDateString("sv-SE")}</div></div><div className="flex items-center gap-3"><span className="font-mono font-semibold">{u.belopp.toFixed(2)} kr</span><button onClick={()=>taUtlagg(u.id)} className="text-gray-300 hover:text-red-500">✕</button></div></div>))}</div></Card>
-        {felrap.length>0&&<Card className="overflow-hidden"><div className="px-4 py-2 bg-gray-50 border-b text-sm font-semibold text-gray-700">{T("Skickade felrapporter","Sent reports")}</div><div className="divide-y">{felrap.map(f=>(<div key={f.id} className="p-3 text-sm"><div className="font-medium">{f.typ}</div><div className="text-xs text-gray-400">{f.text||"—"} · {new Date(f.datum).toLocaleDateString("sv-SE")}</div>{f.plats&&f.plats.adress&&<div className="text-xs text-[#2F4BFF] truncate">📍 {f.plats.adress}</div>}</div>))}</div></Card>}
+          <div className="divide-y">{utlagg.length===0?<div className="p-5 text-center text-sm text-gray-400">{T("Inga utlägg än. Fota ditt första kvitto!","No expenses yet. Scan your first receipt!")}</div>:utlagg.map(u=>(<div key={u.id} className="p-3 flex items-center justify-between text-sm"><div className="flex items-center gap-2 min-w-0">{u.bild&&<a href={u.bild} target="_blank" rel="noreferrer"><img src={u.bild} alt="kvitto" className="w-9 h-9 rounded object-cover border shrink-0"/></a>}<div className="min-w-0"><div className="font-medium">{u.kategori}</div><div className="text-xs text-gray-400">{new Date(u.datum).toLocaleDateString("sv-SE")}</div></div></div><div className="flex items-center gap-3"><span className="font-mono font-semibold">{u.belopp.toFixed(2)} kr</span><button onClick={()=>taUtlagg(u.id)} className="text-gray-300 hover:text-red-500">✕</button></div></div>))}</div></Card>
+        {felrap.length>0&&<Card className="overflow-hidden"><div className="px-4 py-2 bg-gray-50 border-b text-sm font-semibold text-gray-700">{T("Skickade felrapporter","Sent reports")}</div><div className="divide-y">{felrap.map(f=>(<div key={f.id} className="p-3 text-sm flex gap-2">{f.bild&&<a href={f.bild} target="_blank" rel="noreferrer"><img src={f.bild} alt="skada" className="w-12 h-12 rounded object-cover border shrink-0"/></a>}<div className="min-w-0"><div className="font-medium">{f.typ}</div><div className="text-xs text-gray-400">{f.text||"—"} · {new Date(f.datum).toLocaleDateString("sv-SE")}</div>{f.plats&&f.plats.adress&&<div className="text-xs text-[#2F4BFF] truncate">📍 {f.plats.adress}</div>}</div></div>))}</div></Card>}
       </div>}
 
       {ftab==="bil"&&<div className="space-y-3">

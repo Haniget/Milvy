@@ -1663,7 +1663,9 @@ const SB={
   list(table){ return this._req("GET",table+"?select=*&order=created_at.desc"); },
   insert(table,row){ const c=this.cfg(); return this._req("POST",table,{...row,org_id:c.orgId,driver_id:c.driverId}); },
   remove(table,id){ return this._req("DELETE",table+"?id=eq."+id); },
-  removeBy(table,filter){ return this._req("DELETE",table+"?"+filter); }
+  removeBy(table,filter){ return this._req("DELETE",table+"?"+filter); },
+  listTrips(){ const c=this.cfg(); return this._req("GET","trips?select=*,vehicles(reg_nr)&driver_id=eq."+c.driverId+"&order=start_tid.desc&limit=300"); },
+  updateTrip(id,patch){ return this._req("PATCH","trips?id=eq."+id,patch); }
 };
 const KALENDER_KEYWORDS=[["kista","Möte med Kund AB"],["kungsgatan","Leverans City"],["nacka","Möte, Nacka"],["platinav","Materialhämtning"],["jakobsgatan","Kundbesök Jakobsgatan"]];
 function kalenderSyfte(r){ const a=(r.stoppAdress+" "+r.startAdress).toLowerCase(); for(const [k,t] of KALENDER_KEYWORDS){ if(a.includes(k)) return t; } return null; }
@@ -1736,7 +1738,10 @@ function AdressSok({value,onChange,onPick,pick,placeholder,className}){
   </div>);
 }
 function ForarVy({driver,resor,setResor}){
-  const mina=resor.filter(r=>r.forareId===driver.id).sort((a,b)=>b.startTid-a.startTid);
+  const [realTrips,setRealTrips]=useState(null);
+  const mapTrip=(row)=>({ id:row.id, _real:true, forareId:driver.id, forareNamn:driver.namn, fordonRegNr:(row.vehicles&&row.vehicles.reg_nr)||"—", startAdress:row.start_adress||"Okänd plats", stoppAdress:row.stop_adress||"Okänd plats", startTid:new Date(row.start_tid), stoppTid:new Date(row.stop_tid||row.start_tid), startLat:row.start_lat, startLng:row.start_lng, stoppLat:row.stop_lat, stoppLng:row.stop_lng, avstandKm:Number(row.avstand_km)||0, restidMin:row.restid_min||0, hogstaHastighet:row.hogsta_hastighet||0, matarStart:row.matar_start||0, matarStopp:row.matar_stop||0, co2Kg:Number(row.co2_kg)||0, forbrukningLiter:Number(row.forbrukning_l)||0, resetyp:row.resetyp==="privat"?"Privatresa":"Tjänsteresa", resesyfte:row.resesyfte||"", klassad:!!row.klassad });
+  const akta=!!(realTrips&&realTrips.length>0);
+  const mina=akta?realTrips:resor.filter(r=>r.forareId===driver.id).sort((a,b)=>b.startTid-a.startTid);
   const fnamn=driver.namn.split(" ")[0];
   const ko=mina.filter(r=>!r.klassad);
   const klassadeN=mina.length-ko.length;
@@ -1752,7 +1757,7 @@ function ForarVy({driver,resor,setResor}){
   const forslag=(r)=>klassForslag(r,minne);
   const pickVy=(v)=>{ try{localStorage.setItem("msp_forarvy",v);}catch(e){} setVy(v); setValjare(false); };
   const settUndo=(ids,extra)=>{ setAngra({ids,...extra}); clearTimeout(angraT.current); angraT.current=setTimeout(()=>setAngra(null),7000); };
-  const applyKlass=(ids,typ)=>{ setResor(rs=>rs.map(r=>ids.includes(r.id)?{...r,resetyp:typ,klassad:true,resesyfte:r.resesyfte||(typ==="Tjänsteresa"?(kalenderSyfte(r)||"Tjänsteärende"):"Privat resa")}:r)); };
+  const applyKlass=(ids,typ)=>{ if(akta){ const dbTyp=typ==="Tjänsteresa"?"tjanst":"privat"; setRealTrips(ts=>ts.map(r=>ids.includes(r.id)?{...r,resetyp:typ,klassad:true}:r)); if(SB.loggedIn()) ids.forEach(id=>SB.updateTrip(id,{resetyp:dbTyp,klassad:true}).catch(()=>{})); return; } setResor(rs=>rs.map(r=>ids.includes(r.id)?{...r,resetyp:typ,klassad:true,resesyfte:r.resesyfte||(typ==="Tjänsteresa"?(kalenderSyfte(r)||"Tjänsteärende"):"Privat resa")}:r)); };
   const klassa=(id,typ)=>{
     const r=mina.find(x=>x.id===id); if(!r)return; const key=ruttKey(r);
     const nm={...minne,[key]:typ}; setMinne(nm); RUTTMINNE.save(nm);
@@ -1761,7 +1766,7 @@ function ForarVy({driver,resor,setResor}){
   };
   const bekraftaAlla=(par)=>{ const nm={...minne}; par.forEach(p=>{ const r=mina.find(x=>x.id===p.id); if(r)nm[ruttKey(r)]=p.typ; }); setMinne(nm); RUTTMINNE.save(nm);
     const byT={}; par.forEach(p=>byT[p.typ]=[...(byT[p.typ]||[]),p.id]); Object.keys(byT).forEach(t=>applyKlass(byT[t],t)); settUndo(par.map(p=>p.id),{autoN:0}); setAiOv({}); };
-  const angraUndo=()=>{ if(!angra)return; const ids=angra.ids; setResor(rs=>rs.map(r=>ids.includes(r.id)?{...r,klassad:false}:r));
+  const angraUndo=()=>{ if(!angra)return; const ids=angra.ids; if(akta){ setRealTrips(ts=>ts.map(r=>ids.includes(r.id)?{...r,klassad:false}:r)); if(SB.loggedIn()) ids.forEach(id=>SB.updateTrip(id,{klassad:false}).catch(()=>{})); } else setResor(rs=>rs.map(r=>ids.includes(r.id)?{...r,klassad:false}:r));
     if(angra.key){ const nm={...minne}; delete nm[angra.key]; setMinne(nm); RUTTMINNE.save(nm); } setAngra(null); };
   // autoklassa kända rutter (minne från tidigare sessioner) en gång
   useEffect(()=>{ const known=mina.filter(r=>!r.klassad&&minne[ruttKey(r)]); if(!known.length)return; const byT={}; known.forEach(r=>{ const t=minne[ruttKey(r)]; byT[t]=[...(byT[t]||[]),r.id]; }); Object.keys(byT).forEach(t=>applyKlass(byT[t],t)); settUndo(known.map(r=>r.id),{autoN:known.length,known:true}); },[]);
@@ -1807,6 +1812,7 @@ function ForarVy({driver,resor,setResor}){
     const ex=await SB.list("driver_expenses"); if(Array.isArray(ex)) setUtlagg(ex.map(r=>({id:r.id,belopp:Number(r.amount),kategori:r.category,datum:r.created_at,resaId:""})));
     const pl=await SB.list("driver_places"); if(Array.isArray(pl)){ const m={}; pl.forEach(r=>m[r.address_key]=r.label); setPlatser(m); }
     const is=await SB.list("vehicle_issues"); if(Array.isArray(is)) setFelrap(is.map(r=>({id:r.id,typ:r.type,text:r.description,datum:r.created_at,plats:r.lat!=null?{lat:Number(r.lat),lng:Number(r.lng),adress:r.address}:null})));
+    try{ const tr=await SB.listTrips(); if(Array.isArray(tr)) setRealTrips(tr.map(mapTrip)); }catch(e){}
   }catch(e){} };
   useEffect(()=>{ syncDown(); },[]);
   const sbLoggaIn=async()=>{ setSbBusy(true); setSbMsg(""); SB.setCfg({...SB.cfg(),url:sbUrl.trim(),anon:sbAnon.trim()}); try{ await SB.signIn(sbEmail.trim(),sbPw); setSbPw(""); setSbVer(v=>v+1); await syncDown(); visa(T("Synkad mellan enheter ✓","Synced across devices ✓")); }catch(e){ setSbMsg(String(e.message||e).slice(0,220)); } setSbBusy(false); };
@@ -1870,6 +1876,7 @@ function ForarVy({driver,resor,setResor}){
     {bilOpen&&sista&&<BilKartaModal lat={sista.stoppLat} lng={sista.stoppLng} adress={platsNamn(sista.stoppAdress)} onClose={()=>setBilOpen(false)}/>}
     <div className="space-y-5 pb-24">
       <div className={FB} style={{background:"#EEF1FF"}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#2F4BFF" strokeWidth="2"/><path d="M12 8v5" stroke="#2F4BFF" strokeWidth="2" strokeLinecap="round"/><circle cx="12" cy="16" r="1.1" fill="#2F4BFF"/></svg><span className="text-[#22356B]">{T("Du är inloggad som ","Logged in as ")}<strong>{T("förare","driver")}</strong>{T(" – du ser och klassar bara dina egna körningar.",". You only see and classify your own trips.")}</span></div>
+      {akta&&<div className={FB} style={{background:"#ECFDF5"}}><span>🟢</span><span className="text-green-800">{T("Visar riktiga resor från databasen (live).","Showing real trips from the database (live).")}</span></div>}
       {!online&&<div className={FB} style={{background:"#FEF3C7"}}><span>📴</span><span className="text-[#92400E]">{T("Offline – dina ändringar sparas och synkas när du är uppkopplad igen.","Offline – your changes are saved and will sync when you're back online.")}</span></div>}
       <div className="flex items-end justify-between gap-3">
         <div><div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#8A93A0] mb-1">{T("Mina körningar · juni 2026","My trips · June 2026")}</div><h1 className="text-[26px] font-extrabold leading-none">{T("Hej","Hi")} {fnamn}</h1></div>

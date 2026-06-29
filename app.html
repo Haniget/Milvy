@@ -1134,6 +1134,21 @@ function Laddning({laddning,setLaddning}){
 }
 
 /* ============================ AI-INSIKTER (avvik, underhåll, eco, compliance, flottopt, skador) ============================ */
+function SkadeKarta(){
+  const ref=useRef(); const map=useRef(); const [issues,setIssues]=useState(null);
+  useEffect(()=>{ let on=true; (async()=>{ if(!SB.loggedIn())return; try{ const r=await SB.listIssues(); if(on&&Array.isArray(r)) setIssues(r); }catch(e){ if(on)setIssues([]); } })(); return ()=>{on=false;}; },[]);
+  useEffect(()=>{ if(!issues||!issues.length||!ref.current) return; const m=L.map(ref.current); map.current=m; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(m);
+    const farg={Ny:"#dc2626",Mottagen:"#d97706","Åtgärdad":"#16a34a"}; const pts=[];
+    issues.forEach(it=>{ if(it.lat==null||it.lng==null)return; const c=farg[it.status]||"#dc2626";
+      const mk=L.circleMarker([it.lat,it.lng],{radius:9,color:c,fillColor:c,fillOpacity:0.85,weight:2}).addTo(m);
+      const reg=(it.vehicles&&it.vehicles.reg_nr)||"", forare=(it.drivers&&it.drivers.namn)||"";
+      mk.bindPopup("<b>"+it.type+"</b><br>"+(it.description||"")+"<br>"+(it.address||"")+"<br>"+reg+" · "+forare+"<br><i>"+it.status+"</i>");
+      pts.push([it.lat,it.lng]); });
+    if(pts.length) m.fitBounds(pts,{padding:[40,40]}); const t=setTimeout(()=>m.invalidateSize(),250); return ()=>{ clearTimeout(t); m.remove(); }; },[issues]);
+  if(!SB.loggedIn()) return (<Card className="p-4 text-sm text-gray-500">📍 Anslut databasen (knappen högst upp) för att se förarnas inrapporterade skador på karta.</Card>);
+  if(issues&&!issues.length) return (<Card className="p-4 text-sm text-gray-500">Inga inrapporterade skador från förare än.</Card>);
+  return (<Card className="overflow-hidden"><div className="px-4 py-2 bg-gray-50 border-b text-sm font-semibold text-gray-700 flex items-center justify-between"><span>Skadekarta – inrapporterat från förare</span><span className="text-xs text-gray-400">{issues?issues.length+" st":"laddar…"}</span></div><div ref={ref} style={{height:340}}></div><div className="px-4 py-2 text-xs text-gray-500 flex gap-4"><span><span style={{color:"#dc2626"}}>●</span> Ny</span><span><span style={{color:"#d97706"}}>●</span> Mottagen</span><span><span style={{color:"#16a34a"}}>●</span> Åtgärdad</span></div></Card>);
+}
 function AIInsikter({resor,setResor,route,incidenter,setIncidenter,openSettings}){
   const avvik=useMemo(()=>detekteraAvvikelser(resor),[resor]);
   const eco=useMemo(()=>ecoScores(resor),[resor]);
@@ -1177,7 +1192,7 @@ function AIInsikter({resor,setResor,route,incidenter,setIncidenter,openSettings}
     {tab==="flottopt"&&<div className="space-y-3"><Card className="p-4 border-[#C7D1FF] bg-[#EEF1FF]/40"><div className="text-sm text-gray-700">{(()=>{const k=fu.filter(f=>f.farg==="rod").length, p=fu.filter(f=>f.farg==="gul").length; return k||p?("AI ser "+k+" fordon med mycket lågt utnyttjande (kandidater för avveckling) och "+p+" som bör läggas i bilpool. Att avveckla en sällan använd bil sparar typiskt 4 000–6 000 kr/mån i leasing och försäkring."):"Flottan utnyttjas väl – inga uppenbara nedskärningskandidater.";})()}</div></Card>
       <Card className="overflow-hidden"><table className="w-full text-sm"><thead><tr className="text-left text-gray-500 bg-gray-50 border-b"><th className="px-4 py-2">Utnyttjande</th><th>Fordon</th><th>Dagar (av 14)</th><th>Resor</th><th>Sträcka</th><th>Rekommendation</th></tr></thead><tbody>{fu.map(f=>(<tr key={f.v.id} className="border-b last:border-0 hover:bg-gray-50"><td className="px-4 py-2"><div className="flex items-center gap-2"><div className="w-16 bg-gray-100 rounded-full h-2"><div className={"h-2 rounded-full "+(f.farg==="rod"?"bg-red-500":f.farg==="gul"?"bg-amber-500":"bg-green-500")} style={{width:f.utnyttjande+"%"}}></div></div><span className="text-xs">{f.utnyttjande}%</span></div></td><td className="font-medium">{f.v.regNr}</td><td>{f.dagar}</td><td>{f.resor}</td><td>{kr(f.km)} km</td><td><Badge color={f.farg}>{f.rek}</Badge></td></tr>))}</tbody></table></Card></div>}
 
-    {tab==="skador"&&<Card className="overflow-hidden"><table className="w-full text-sm"><thead><tr className="text-left text-gray-500 bg-gray-50 border-b"><th className="px-4 py-2">Allvar</th><th>Typ</th><th>Fordon</th><th>Förare</th><th>G-kraft</th><th>Tid</th><th>Plats</th><th>Status</th><th></th></tr></thead><tbody>{incidenter.map(it=>(<tr key={it.id} className="border-b last:border-0 hover:bg-gray-50"><td className="px-4 py-2"><Badge color={it.allvar==="hog"?"rod":"gul"}>{it.allvar==="hog"?"Hög":"Medel"}</Badge></td><td className="font-medium">{it.typ}</td><td>{it.fordonRegNr}</td><td>{it.forare}</td><td>{it.gkraft} G</td><td className="text-gray-500 whitespace-nowrap">{it.tid}</td><td className="text-gray-500">{it.adress.split(",")[0]}</td><td><Badge color={it.status==="Ny"?"rod":"gron"}>{it.status}</Badge></td><td><button onClick={()=>setClaim(it)} className="text-xs text-blue-700 hover:underline whitespace-nowrap">Förbered anmälan</button></td></tr>))}{incidenter.length===0&&<tr><td colSpan="9" className="p-8 text-center text-gray-400">Inga incidenter.</td></tr>}</tbody></table></Card>}
+    {tab==="skador"&&<div className="space-y-3"><SkadeKarta/><Card className="overflow-hidden"><table className="w-full text-sm"><thead><tr className="text-left text-gray-500 bg-gray-50 border-b"><th className="px-4 py-2">Allvar</th><th>Typ</th><th>Fordon</th><th>Förare</th><th>G-kraft</th><th>Tid</th><th>Plats</th><th>Status</th><th></th></tr></thead><tbody>{incidenter.map(it=>(<tr key={it.id} className="border-b last:border-0 hover:bg-gray-50"><td className="px-4 py-2"><Badge color={it.allvar==="hog"?"rod":"gul"}>{it.allvar==="hog"?"Hög":"Medel"}</Badge></td><td className="font-medium">{it.typ}</td><td>{it.fordonRegNr}</td><td>{it.forare}</td><td>{it.gkraft} G</td><td className="text-gray-500 whitespace-nowrap">{it.tid}</td><td className="text-gray-500">{it.adress.split(",")[0]}</td><td><Badge color={it.status==="Ny"?"rod":"gron"}>{it.status}</Badge></td><td><button onClick={()=>setClaim(it)} className="text-xs text-blue-700 hover:underline whitespace-nowrap">Förbered anmälan</button></td></tr>))}{incidenter.length===0&&<tr><td colSpan="9" className="p-8 text-center text-gray-400">Inga incidenter.</td></tr>}</tbody></table></Card></div>}
     {claim&&<ClaimModal it={claim} onClose={()=>setClaim(null)} onDone={(id)=>{ setIncidenter(xs=>xs.map(x=>x.id===id?{...x,status:"Anmälan förberedd"}:x)); setClaim(null); }}/>}
   </div>);
 }
@@ -1649,15 +1664,17 @@ const SB={
   setCfg(c){ try{localStorage.setItem("msp_sb",JSON.stringify(c));}catch(e){} },
   base(){ return (this.cfg().url||"").replace(/\/+$/,""); },
   configured(){ const c=this.cfg(); return !!(c.url&&c.anon); },
-  loggedIn(){ const c=this.cfg(); return !!(c.url&&c.anon&&c.token&&c.driverId); },
+  loggedIn(){ const c=this.cfg(); return !!(c.url&&c.anon&&c.token&&c.orgId); },
+  loggedInDriver(){ const c=this.cfg(); return !!(c.url&&c.anon&&c.token&&c.driverId); },
+  isAdmin(){ const r=this.cfg().role; return r==="admin"||r==="owner"||r==="aterforsaljare"; },
   status(){ if(this.loggedIn())return "online"; if(this.configured())return "config"; return "local"; },
   async signIn(email,password){ const c=this.cfg(); if(!c.url||!c.anon) throw new Error("Ange Supabase-URL och anon-nyckel först.");
     const r=await fetch(this.base()+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:c.anon,"Content-Type":"application/json"},body:JSON.stringify({email,password})});
     const j=await r.json(); if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||"Inloggning misslyckades.");
-    let driverId=null, orgId=null;
-    try{ const m=await fetch(this.base()+"/rest/v1/memberships?select=driver_id,org_id&limit=1",{headers:{apikey:c.anon,Authorization:"Bearer "+j.access_token}}); const ma=await m.json(); if(Array.isArray(ma)&&ma[0]){ driverId=ma[0].driver_id; orgId=ma[0].org_id; } }catch(e){}
-    if(!driverId) throw new Error("Inloggad, men kontot saknar koppling till en förare (memberships.driver_id). Be admin koppla dig.");
-    this.setCfg({...c,token:j.access_token,uid:j.user&&j.user.id,driverId,orgId,email}); return true; },
+    let driverId=null, orgId=null, role=null;
+    try{ const m=await fetch(this.base()+"/rest/v1/memberships?select=driver_id,org_id,role&limit=1",{headers:{apikey:c.anon,Authorization:"Bearer "+j.access_token}}); const ma=await m.json(); if(Array.isArray(ma)&&ma[0]){ driverId=ma[0].driver_id; orgId=ma[0].org_id; role=ma[0].role; } }catch(e){}
+    if(!orgId) throw new Error("Inloggad, men kontot saknar koppling till en organisation (memberships). Be admin koppla dig.");
+    this.setCfg({...c,token:j.access_token,uid:j.user&&j.user.id,driverId,orgId,role,email}); return true; },
   signOut(){ const c=this.cfg(); this.setCfg({url:c.url,anon:c.anon}); },
   async _req(method,path,body){ const c=this.cfg(); const r=await fetch(this.base()+"/rest/v1/"+path,{method,headers:{apikey:c.anon,Authorization:"Bearer "+c.token,"Content-Type":"application/json",Prefer:"return=representation"},body:body?JSON.stringify(body):undefined}); if(!r.ok) throw new Error(await r.text()); return method==="DELETE"?true:r.json(); },
   list(table){ return this._req("GET",table+"?select=*&order=created_at.desc"); },
@@ -1665,6 +1682,8 @@ const SB={
   remove(table,id){ return this._req("DELETE",table+"?id=eq."+id); },
   removeBy(table,filter){ return this._req("DELETE",table+"?"+filter); },
   listTrips(){ const c=this.cfg(); return this._req("GET","trips?select=*,vehicles(reg_nr)&driver_id=eq."+c.driverId+"&order=start_tid.desc&limit=300"); },
+  listOrgTrips(){ return this._req("GET","trips?select=*,vehicles(reg_nr),drivers(namn)&order=start_tid.desc&limit=500"); },
+  listIssues(){ return this._req("GET","vehicle_issues?select=*,vehicles(reg_nr),drivers(namn)&order=created_at.desc&limit=300"); },
   updateTrip(id,patch){ return this._req("PATCH","trips?id=eq."+id,patch); }
 };
 const KALENDER_KEYWORDS=[["kista","Möte med Kund AB"],["kungsgatan","Leverans City"],["nacka","Möte, Nacka"],["platinav","Materialhämtning"],["jakobsgatan","Kundbesök Jakobsgatan"]];
@@ -1757,7 +1776,7 @@ function ForarVy({driver,resor,setResor}){
   const forslag=(r)=>klassForslag(r,minne);
   const pickVy=(v)=>{ try{localStorage.setItem("msp_forarvy",v);}catch(e){} setVy(v); setValjare(false); };
   const settUndo=(ids,extra)=>{ setAngra({ids,...extra}); clearTimeout(angraT.current); angraT.current=setTimeout(()=>setAngra(null),7000); };
-  const applyKlass=(ids,typ)=>{ if(akta){ const dbTyp=typ==="Tjänsteresa"?"tjanst":"privat"; setRealTrips(ts=>ts.map(r=>ids.includes(r.id)?{...r,resetyp:typ,klassad:true}:r)); if(SB.loggedIn()) ids.forEach(id=>SB.updateTrip(id,{resetyp:dbTyp,klassad:true}).catch(()=>{})); return; } setResor(rs=>rs.map(r=>ids.includes(r.id)?{...r,resetyp:typ,klassad:true,resesyfte:r.resesyfte||(typ==="Tjänsteresa"?(kalenderSyfte(r)||"Tjänsteärende"):"Privat resa")}:r)); };
+  const applyKlass=(ids,typ)=>{ if(akta){ const dbTyp=typ==="Tjänsteresa"?"tjanst":"privat"; setRealTrips(ts=>ts.map(r=>ids.includes(r.id)?{...r,resetyp:typ,klassad:true}:r)); if(SB.loggedInDriver()) ids.forEach(id=>SB.updateTrip(id,{resetyp:dbTyp,klassad:true}).catch(()=>{})); return; } setResor(rs=>rs.map(r=>ids.includes(r.id)?{...r,resetyp:typ,klassad:true,resesyfte:r.resesyfte||(typ==="Tjänsteresa"?(kalenderSyfte(r)||"Tjänsteärende"):"Privat resa")}:r)); };
   const klassa=(id,typ)=>{
     const r=mina.find(x=>x.id===id); if(!r)return; const key=ruttKey(r);
     const nm={...minne,[key]:typ}; setMinne(nm); RUTTMINNE.save(nm);
@@ -1766,7 +1785,7 @@ function ForarVy({driver,resor,setResor}){
   };
   const bekraftaAlla=(par)=>{ const nm={...minne}; par.forEach(p=>{ const r=mina.find(x=>x.id===p.id); if(r)nm[ruttKey(r)]=p.typ; }); setMinne(nm); RUTTMINNE.save(nm);
     const byT={}; par.forEach(p=>byT[p.typ]=[...(byT[p.typ]||[]),p.id]); Object.keys(byT).forEach(t=>applyKlass(byT[t],t)); settUndo(par.map(p=>p.id),{autoN:0}); setAiOv({}); };
-  const angraUndo=()=>{ if(!angra)return; const ids=angra.ids; if(akta){ setRealTrips(ts=>ts.map(r=>ids.includes(r.id)?{...r,klassad:false}:r)); if(SB.loggedIn()) ids.forEach(id=>SB.updateTrip(id,{klassad:false}).catch(()=>{})); } else setResor(rs=>rs.map(r=>ids.includes(r.id)?{...r,klassad:false}:r));
+  const angraUndo=()=>{ if(!angra)return; const ids=angra.ids; if(akta){ setRealTrips(ts=>ts.map(r=>ids.includes(r.id)?{...r,klassad:false}:r)); if(SB.loggedInDriver()) ids.forEach(id=>SB.updateTrip(id,{klassad:false}).catch(()=>{})); } else setResor(rs=>rs.map(r=>ids.includes(r.id)?{...r,klassad:false}:r));
     if(angra.key){ const nm={...minne}; delete nm[angra.key]; setMinne(nm); RUTTMINNE.save(nm); } setAngra(null); };
   // autoklassa kända rutter (minne från tidigare sessioner) en gång
   useEffect(()=>{ const known=mina.filter(r=>!r.klassad&&minne[ruttKey(r)]); if(!known.length)return; const byT={}; known.forEach(r=>{ const t=minne[ruttKey(r)]; byT[t]=[...(byT[t]||[]),r.id]; }); Object.keys(byT).forEach(t=>applyKlass(byT[t],t)); settUndo(known.map(r=>r.id),{autoN:known.length,known:true}); },[]);
@@ -1808,7 +1827,7 @@ function ForarVy({driver,resor,setResor}){
   const [sbVer,setSbVer]=useState(0); const sbStat=SB.status();
   const [sbUrl,setSbUrl]=useState(()=>SB.cfg().url||""); const [sbAnon,setSbAnon]=useState(()=>SB.cfg().anon||"");
   const [sbEmail,setSbEmail]=useState(()=>SB.cfg().email||""); const [sbPw,setSbPw]=useState(""); const [sbBusy,setSbBusy]=useState(false); const [sbMsg,setSbMsg]=useState("");
-  const syncDown=async()=>{ if(!SB.loggedIn())return; try{
+  const syncDown=async()=>{ if(!SB.loggedInDriver())return; try{
     const ex=await SB.list("driver_expenses"); if(Array.isArray(ex)) setUtlagg(ex.map(r=>({id:r.id,belopp:Number(r.amount),kategori:r.category,datum:r.created_at,resaId:""})));
     const pl=await SB.list("driver_places"); if(Array.isArray(pl)){ const m={}; pl.forEach(r=>m[r.address_key]=r.label); setPlatser(m); }
     const is=await SB.list("vehicle_issues"); if(Array.isArray(is)) setFelrap(is.map(r=>({id:r.id,typ:r.type,text:r.description,datum:r.created_at,plats:r.lat!=null?{lat:Number(r.lat),lng:Number(r.lng),adress:r.address}:null})));
@@ -1818,15 +1837,15 @@ function ForarVy({driver,resor,setResor}){
   const sbLoggaIn=async()=>{ setSbBusy(true); setSbMsg(""); SB.setCfg({...SB.cfg(),url:sbUrl.trim(),anon:sbAnon.trim()}); try{ await SB.signIn(sbEmail.trim(),sbPw); setSbPw(""); setSbVer(v=>v+1); await syncDown(); visa(T("Synkad mellan enheter ✓","Synced across devices ✓")); }catch(e){ setSbMsg(String(e.message||e).slice(0,220)); } setSbBusy(false); };
   const sbLoggaUt=()=>{ SB.signOut(); setSbVer(v=>v+1); visa(T("Utloggad – data sparas lokalt","Signed out – stored locally")); };
   const sparaUtlagg=async(u)=>{ setKvittoOpen(false); visa(T("Utlägg sparat ✓","Expense saved ✓"));
-    if(SB.loggedIn()){ try{ const row=await SB.insert("driver_expenses",{amount:u.belopp,category:u.kategori,note:null}); const rr=Array.isArray(row)?row[0]:row; setUtlagg(x=>[{id:rr.id,belopp:Number(rr.amount),kategori:rr.category,datum:rr.created_at,resaId:""},...x]); return; }catch(e){} }
+    if(SB.loggedInDriver()){ try{ const row=await SB.insert("driver_expenses",{amount:u.belopp,category:u.kategori,note:null}); const rr=Array.isArray(row)?row[0]:row; setUtlagg(x=>[{id:rr.id,belopp:Number(rr.amount),kategori:rr.category,datum:rr.created_at,resaId:""},...x]); return; }catch(e){} }
     setUtlagg(x=>[u,...x]); };
-  const taUtlagg=(id)=>{ setUtlagg(x=>x.filter(y=>y.id!==id)); if(SB.loggedIn())SB.remove("driver_expenses",id).catch(()=>{}); };
+  const taUtlagg=(id)=>{ setUtlagg(x=>x.filter(y=>y.id!==id)); if(SB.loggedInDriver())SB.remove("driver_expenses",id).catch(()=>{}); };
   const sparaFel=async(f)=>{ setFelOpen(false); visa(T("Felrapport skickad till admin ✓","Report sent ✓")); if(Notis.ok())Notis.skicka("Milvy","Felrapport skickad: "+f.typ);
-    if(SB.loggedIn()){ try{ const ftyp=(f.typ==="Skada / buckla"||f.typ==="Krock / olycka")?"Skada":f.typ==="Däck / punktering"?"Däck":(f.typ==="Varningslampa"?"Varningslampa":"Övrigt"); const p=f.plats||{}; const row=await SB.insert("vehicle_issues",{type:ftyp,description:f.text,lat:p.lat,lng:p.lng,address:p.adress||null}); const rr=Array.isArray(row)?row[0]:row; setFelrap(x=>[{id:rr.id,typ:rr.type,text:rr.description,datum:rr.created_at,plats:rr.lat!=null?{lat:Number(rr.lat),lng:Number(rr.lng),adress:rr.address}:null},...x]); return; }catch(e){} }
+    if(SB.loggedInDriver()){ try{ const ftyp=(f.typ==="Skada / buckla"||f.typ==="Krock / olycka")?"Skada":f.typ==="Däck / punktering"?"Däck":(f.typ==="Varningslampa"?"Varningslampa":"Övrigt"); const p=f.plats||{}; const row=await SB.insert("vehicle_issues",{type:ftyp,description:f.text,lat:p.lat,lng:p.lng,address:p.adress||null}); const rr=Array.isArray(row)?row[0]:row; setFelrap(x=>[{id:rr.id,typ:rr.type,text:rr.description,datum:rr.created_at,plats:rr.lat!=null?{lat:Number(rr.lat),lng:Number(rr.lng),adress:rr.address}:null},...x]); return; }catch(e){} }
     setFelrap(x=>[f,...x]); };
   const laggPlats=async()=>{ const a=nyPlatsAdr.trim(), n=nyPlatsNamn.trim(); if(!a||!n)return; setNyPlatsAdr(""); setNyPlatsNamn(""); setPlatser(p=>({...p,[a]:n}));
-    if(SB.loggedIn()){ try{ await SB.insert("driver_places",{address_key:a,label:n}); }catch(e){} } };
-  const taPlats=(a)=>{ setPlatser(p=>{const x={...p}; delete x[a]; return x;}); if(SB.loggedIn())SB.removeBy("driver_places","address_key=eq."+encodeURIComponent(a)).catch(()=>{}); };
+    if(SB.loggedInDriver()){ try{ await SB.insert("driver_places",{address_key:a,label:n}); }catch(e){} } };
+  const taPlats=(a)=>{ setPlatser(p=>{const x={...p}; delete x[a]; return x;}); if(SB.loggedInDriver())SB.removeBy("driver_places","address_key=eq."+encodeURIComponent(a)).catch(()=>{}); };
   const slaPaNotis=async()=>{ const ok=await Notis.be(); setNotisPa(ok); visa(ok?T("Notiser på ✓","Notifications on ✓"):T("Notiser nekades i webbläsaren","Notifications blocked")); if(ok)Notis.skicka("Milvy",T("Du får nu påminnelser om oklassade resor.","You'll get reminders for unclassified trips.")); };
 
   const FB="rounded-xl p-3 text-sm flex items-center gap-2";
@@ -1957,10 +1976,42 @@ function ForarVy({driver,resor,setResor}){
   </div>);
 }
 
+function DbConnectModal({onClose,onConnected}){
+  const [url,setUrl]=useState(()=>SB.cfg().url||""); const [anon,setAnon]=useState(()=>SB.cfg().anon||"");
+  const [email,setEmail]=useState(()=>SB.cfg().email||""); const [pw,setPw]=useState(""); const [busy,setBusy]=useState(false); const [msg,setMsg]=useState("");
+  const koppla=async()=>{ setBusy(true); setMsg(""); SB.setCfg({...SB.cfg(),url:url.trim(),anon:anon.trim()}); try{ await SB.signIn(email.trim(),pw); setPw(""); onConnected(); }catch(e){ setMsg(String(e.message||e).slice(0,220)); } setBusy(false); };
+  return (<div className="fixed inset-0 bg-black/50 z-[2300] flex items-center justify-center p-4" onClick={onClose}><Card className="w-[440px] max-w-full p-5" onClick={e=>e.stopPropagation()}>
+    <div className="flex items-center justify-between mb-2"><h2 className="font-bold text-lg">Anslut databas</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button></div>
+    <p className="text-sm text-gray-500 mb-3">Logga in som administratör för att visa och redigera riktiga resor från Supabase. Lösenordet går direkt till din Supabase – Milvy lagrar det aldrig.</p>
+    <div className="space-y-2">
+      <input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Supabase URL (https://xxx.supabase.co)" className="w-full border rounded px-2 py-1.5 text-sm"/>
+      <input value={anon} onChange={e=>setAnon(e.target.value)} placeholder="Anon public key" className="w-full border rounded px-2 py-1.5 text-sm"/>
+      <div className="grid grid-cols-2 gap-2"><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="E-post" className="border rounded px-2 py-1.5 text-sm"/><input value={pw} onChange={e=>setPw(e.target.value)} type="password" placeholder="Lösenord" className="border rounded px-2 py-1.5 text-sm"/></div>
+      {msg&&<div className="text-xs text-red-600 break-words">{msg}</div>}
+      <button onClick={koppla} disabled={busy} className="w-full py-2 rounded-lg text-white text-sm font-medium disabled:opacity-60" style={{background:"#0E1726"}}>{busy?"Ansluter…":"Anslut & logga in"}</button>
+    </div>
+  </Card></div>);
+}
+
 /* ============================ APP ============================ */
 function App(){
   const [route,setRoute]=useState({name:"oversikt"});
-  const [resor,setResor]=useState(()=>applyResorOv(RESOR));
+  const [resor,setResorRaw]=useState(()=>applyResorOv(RESOR));
+  const [dbAdmin,setDbAdmin]=useState(false); const dbAdminRef=useRef(false); const [dbConnect,setDbConnect]=useState(false);
+  const mapDbTrip=(row)=>({ id:row.id,_real:true, forareId:row.driver_id||"", forareNamn:(row.drivers&&row.drivers.namn)||"—", fordonRegNr:(row.vehicles&&row.vehicles.reg_nr)||"—", startAdress:row.start_adress||"Okänd plats", stoppAdress:row.stop_adress||"Okänd plats", startTid:new Date(row.start_tid), stoppTid:new Date(row.stop_tid||row.start_tid), startLat:row.start_lat, startLng:row.start_lng, stoppLat:row.stop_lat, stoppLng:row.stop_lng, avstandKm:Number(row.avstand_km)||0, restidMin:row.restid_min||0, hogstaHastighet:row.hogsta_hastighet||0, matarStart:row.matar_start||0, matarStopp:row.matar_stop||0, co2Kg:Number(row.co2_kg)||0, forbrukningLiter:Number(row.forbrukning_l)||0, resetyp:row.resetyp==="privat"?"Privatresa":"Tjänsteresa", resesyfte:row.resesyfte||"", klassad:!!row.klassad, attesterad:!!row.attesterad });
+  const setResor=(updater)=>{ setResorRaw(prev=>{ const next=typeof updater==="function"?updater(prev):updater;
+    if(dbAdminRef.current&&SB.loggedIn()){ const byId={}; prev.forEach(r=>byId[r.id]=r);
+      next.forEach(r=>{ if(!r._real)return; const p=byId[r.id]; if(!p)return; const patch={};
+        if(r.resetyp!==p.resetyp) patch.resetyp=r.resetyp==="Tjänsteresa"?"tjanst":r.resetyp==="Privatresa"?"privat":"oklassad";
+        if(r.resesyfte!==p.resesyfte) patch.resesyfte=r.resesyfte;
+        if(r.klassad!==p.klassad) patch.klassad=r.klassad;
+        if(r.attesterad!==p.attesterad) patch.attesterad=r.attesterad;
+        if(Object.keys(patch).length) SB.updateTrip(r.id,patch).catch(()=>{}); }); }
+    return next; }); };
+  const laddaOrgResor=async()=>{ try{ const tr=await SB.listOrgTrips(); if(Array.isArray(tr)){ setResorRaw(tr.map(mapDbTrip)); setDbAdmin(true); dbAdminRef.current=true; } }catch(e){} };
+  const dbKoppla=()=>{ setDbConnect(false); laddaOrgResor(); };
+  const dbKopplaUt=()=>{ SB.signOut(); setDbAdmin(false); dbAdminRef.current=false; setResorRaw(applyResorOv(RESOR)); };
+  useEffect(()=>{ if(SB.loggedIn()&&SB.isAdmin()) laddaOrgResor(); },[]);
   const [kvitton,setKvitton]=useState(()=>DB.load("kvitton",KVITTON_INIT));
   const [laddning,setLaddning]=useState(()=>DB.load("laddning",LADDNING_INIT));
   const [incidenter,setIncidenter]=useState(()=>DB.load("incidenter",INCIDENTER_INIT));
@@ -1989,6 +2040,9 @@ function App(){
       <button onClick={()=>setNavOpen(true)} className="p-1"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       <span className="font-display font-bold">Milvy</span></div>
     <main className="max-w-[1180px] w-full mx-auto px-4 sm:px-6 py-6 pb-24">
+      {roll!=="forare"&&<div className="mb-4 flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm" style={{background:dbAdmin?"#ECFDF5":"#EEF1FF"}}>
+        <span className={dbAdmin?"text-green-800":"text-[#22356B]"}>{dbAdmin?"🟢 Ansluten till databasen – visar riktiga resor från Supabase":"Visar demodata (mock). Anslut databasen för riktiga resor."}</span>
+        {dbAdmin?<button onClick={dbKopplaUt} className="text-[#2F4BFF] font-medium shrink-0">Koppla från</button>:<button onClick={()=>setDbConnect(true)} className="px-3 py-1 rounded-lg text-white font-medium shrink-0" style={{background:"#0E1726"}}>Anslut databas</button>}</div>}
       {roll==="forare" ? <ForarVy driver={forareJag} resor={resor} setResor={setResor}/> : <React.Fragment>
       {route.name==="oversikt"&&<Dashboard resor={resor} kvitton={kvitton} incidenter={incidenter} zoner={zoner} setRoute={setRoute} openOnboarding={()=>setOnboard(true)}/>}
       {route.name==="karta"&&<KartaHub key={hubKey} S={S}/>}
@@ -2004,6 +2058,7 @@ function App(){
     </div>
     <AIAssistant resor={resor} setResor={setResor} open={aiOpen} setOpen={setAiOpen} openSettings={openSettings}/>
     {settings&&<AISettings onClose={closeSettings}/>}
+    {dbConnect&&<DbConnectModal onClose={()=>setDbConnect(false)} onConnected={dbKoppla}/>}
     <ConfirmHost/>
     {onboard&&<OnboardingChecklist setRoute={setRoute} onClose={()=>{localStorage.setItem("milspar_onb_seen","1"); setOnboard(false);}}/>}
   </div>);

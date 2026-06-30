@@ -630,7 +630,7 @@ function Dashboard({resor,kvitton,incidenter,zoner,setRoute,openOnboarding}){
   const now=idag; const d30=new Date(now); d30.setDate(now.getDate()-30);
   const r30=resor.filter(r=>r.startTid>=d30); const ridag=resor.filter(r=>fmtDatum(r.startTid)===fmtDatum(now));
   const km30=Math.round(r30.reduce((s,r)=>s+r.avstandKm,0));
-  const tj30=r30.filter(r=>r.resetyp==="Tjänsteresa"); const tjKm30=tj30.reduce((s,r)=>s+r.avstandKm,0);
+  const tj30=r30.filter(r=>r.resetyp==="Tjänsteresa" && r.klassad!==false); const tjKm30=tj30.reduce((s,r)=>s+r.avstandKm,0);
   const ers=Math.round(tjKm30/10*25); // 25 kr/mil
   const aktiva=FORDON.filter(v=>v.status==="aktiv").length;
   const cs=complianceSummary(resor);
@@ -758,7 +758,7 @@ function DriverModal({driver,resor,onClose,onSave}){
   const invite=()=>{ setToast("App-inbjudan skickad till "+(f.epost||"föraren")); setTimeout(()=>setToast(""),2200); };
   const dgrKort = f.korkortGiltigt? Math.round((new Date(f.korkortGiltigt)-idag)/86400000):null;
   const dr=resor.filter(r=>r.forareId===f.id);
-  const tjmil=Math.round(dr.filter(r=>r.resetyp==="Tjänsteresa").reduce((s,r)=>s+r.avstandKm,0)/10*10)/10;
+  const tjmil=Math.round(dr.filter(r=>r.resetyp==="Tjänsteresa" && r.klassad!==false).reduce((s,r)=>s+r.avstandKm,0)/10*10)/10;
   const eco=ecoScores(resor).find(e=>e.driver.id===f.id);
   const beh=forarbeteende().find(e=>e.driver.id===f.id);
   const senaste=dr[0];
@@ -949,7 +949,7 @@ function Korjournal({resor,setResor,priv}){
   const [kolOpen,setKolOpen]=useState(false); const visa=(k)=>kol[k]!==false;
   useEffect(()=>{ try{localStorage.setItem("msp_kjkol",JSON.stringify(kol));}catch(e){} },[kol]);
   // Skattefri milersättning: 25 kr/mil = 2,50 kr/km för tjänsteresa
-  const ERS_KM=2.5; const ersFor=(r)=> r.resetyp==="Tjänsteresa" ? r.avstandKm*ERS_KM : 0;
+  const ERS_KM=2.5; const ersFor=(r)=> (r.resetyp==="Tjänsteresa" && r.klassad!==false) ? r.avstandKm*ERS_KM : 0;
   // Sortering inom dagsgrupp
   const [sort,setSort]=useState({key:"",dir:1});
   const sortClick=(k)=>setSort(s=>s.key===k?{key:k,dir:-s.dir}:{key:k,dir:1});
@@ -999,8 +999,8 @@ function Korjournal({resor,setResor,priv}){
       <button onClick={markeraAlla} className="text-[#2F4BFF] hover:underline">Markera alla för bulk</button></div>
     {valda.size>0&&<Card className="p-3 flex flex-wrap items-center gap-2 sticky top-2 z-[40]" style={{background:"#0E1726"}}>
       <span className="text-white text-sm font-medium mr-1">{valda.size} markerade</span>
-      <button onClick={()=>bulk({resetyp:"Tjänsteresa"},"klassade som Tjänst")} className="px-3 py-1.5 rounded-lg text-sm font-medium" style={{background:"#C2F24D",color:"#0E1726"}}>Klassa Tjänst</button>
-      <button onClick={()=>bulk({resetyp:"Privatresa"},"klassade som Privat")} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-white text-[#0E1726]">Klassa Privat</button>
+      <button onClick={()=>bulk({resetyp:"Tjänsteresa",klassad:true},"klassade som Tjänst")} className="px-3 py-1.5 rounded-lg text-sm font-medium" style={{background:"#C2F24D",color:"#0E1726"}}>Klassa Tjänst</button>
+      <button onClick={()=>bulk({resetyp:"Privatresa",klassad:true},"klassade som Privat")} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-white text-[#0E1726]">Klassa Privat</button>
       <button onClick={()=>bulk({attesterad:true},"attesterade")} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-white text-[#0E1726]">Attestera</button>
       {valda.size>=2&&<button onClick={slaIhop} className="px-3 py-1.5 rounded-lg text-sm font-medium border border-[#C2F24D] text-[#C2F24D]">⇲ Slå ihop ({valda.size})</button>}
       <button onClick={markeraAlla} className="px-3 py-1.5 rounded-lg text-sm border border-[#3A4660] text-white">Markera alla ({filt.length})</button>
@@ -1019,7 +1019,7 @@ function Korjournal({resor,setResor,priv}){
           <td className="text-gray-600"><div>{maskad(r)?"Privat adress":r.stoppAdress.split(",")[0]}</div><div className="text-xs text-gray-400">{fmtTid(r.stoppTid)}</div></td>
           {visa("restid")&&<td className="whitespace-nowrap">{r.restidMin} min</td>}<td className="whitespace-nowrap">{r.avstandKm} km</td>
           {visa("matarst")&&<td className="text-xs whitespace-nowrap" title="Mätarställning start / stopp"><span className="text-gray-400 font-mono">start</span> {kr(r.matarStart)}<br/><span className="text-gray-400 font-mono">stopp</span> {kr(r.matarStopp)}</td>}{visa("forbr")&&<td className="text-xs whitespace-nowrap" title="CO₂-utsläpp / bränsleförbrukning"><span className="text-gray-400 font-mono">CO₂</span> {r.co2Kg} kg<br/><span className="text-gray-400 font-mono">förbr</span> {r.forbrukningLiter} l</td>}
-          <td><select disabled={r.attesterad} value={r.resetyp} onChange={e=>upd(r.id,{resetyp:e.target.value})} className="text-xs border rounded px-1.5 py-1 bg-white"><option>Tjänsteresa</option><option>Privatresa</option></select></td>
+          <td><select disabled={r.attesterad} value={r.resetyp} onChange={e=>upd(r.id,{resetyp:e.target.value,klassad:true})} className="text-xs border rounded px-1.5 py-1 bg-white"><option>Tjänsteresa</option><option>Privatresa</option></select></td>
           <td><div className="flex items-center gap-1"><input list="vanliga-syften" disabled={r.attesterad} value={r.resesyfte} onChange={e=>upd(r.id,{resesyfte:e.target.value})} placeholder="—" className="text-xs border rounded px-2 py-1 w-24"/><button title="Föreslå resesyfte med AI" disabled={r.attesterad} onClick={()=>upd(r.id,heurResesyfte(r))} className="text-[10px] font-mono font-semibold px-1.5 py-1 rounded bg-[#EEF1FF] text-[#2F4BFF] hover:bg-[#dfe5ff] disabled:opacity-40">AI</button><button title="Notering & dela" onClick={()=>toggleOppen(r.id)} className={"text-xs px-1.5 py-1 rounded "+(r.notering?"bg-amber-100 text-amber-700":"text-gray-400 hover:bg-gray-100")}>✎</button></div></td>
           {visa("max")&&<td className="whitespace-nowrap">{r.hogstaHastighet} km/h</td>}{visa("ers")&&<td className="whitespace-nowrap font-medium" title="Skattefri ersättning 25 kr/mil">{ersFor(r)?kr(Math.round(ersFor(r)))+" kr":"—"}</td>}<td><input type="checkbox" checked={r.attesterad} onChange={e=>upd(r.id,{attesterad:e.target.checked})} title="Attestera"/></td>
         </tr>{oppen.has(r.id)&&<tr className="bg-[#FAFAF7] border-b"><td colSpan={20} className="px-3 py-2"><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-xs text-gray-600 flex-1 min-w-[220px]">Notering<input value={r.notering||""} onChange={e=>upd(r.id,{notering:e.target.value})} placeholder="t.ex. lämnade verktyg hos kund" className="text-sm border rounded px-2 py-1 flex-1"/></label><button disabled={r.attesterad} onClick={()=>delaResa(r)} className="text-xs px-2.5 py-1.5 rounded border text-gray-700 hover:bg-gray-50 disabled:opacity-40">✂ Dela resa i två</button></div></td></tr>}</React.Fragment>))}</tbody>
@@ -1029,7 +1029,7 @@ function Korjournal({resor,setResor,priv}){
         <div className="text-sm text-gray-600">{maskad(r)?"Privat resa":r.startAdress.split(",")[0]+" → "+r.stoppAdress.split(",")[0]}</div>
         <div className="text-xs text-gray-400 mb-2">{r.forareNamn} · {r.avstandKm} km · {r.hogstaHastighet} km/h{ersFor(r)?" · "+kr(Math.round(ersFor(r)))+" kr":""}</div>
         <div className="flex items-center gap-2 flex-wrap">
-          <select disabled={r.attesterad} value={r.resetyp} onChange={e=>upd(r.id,{resetyp:e.target.value})} className="text-xs border rounded px-2 py-1 bg-white"><option>Tjänsteresa</option><option>Privatresa</option></select>
+          <select disabled={r.attesterad} value={r.resetyp} onChange={e=>upd(r.id,{resetyp:e.target.value,klassad:true})} className="text-xs border rounded px-2 py-1 bg-white"><option>Tjänsteresa</option><option>Privatresa</option></select>
           <input list="vanliga-syften" disabled={r.attesterad} value={r.resesyfte} onChange={e=>upd(r.id,{resesyfte:e.target.value})} placeholder="Resesyfte" className="text-xs border rounded px-2 py-1 flex-1 min-w-[90px]"/>
           <label className="flex items-center gap-1 text-xs whitespace-nowrap"><input type="checkbox" checked={r.attesterad} onChange={e=>upd(r.id,{attesterad:e.target.checked})}/>Att.</label>
           {!maskad(r)&&<button onClick={()=>setMapTrip(r)} className="text-blue-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={ICON.karta}/></svg></button>}
@@ -1765,7 +1765,7 @@ function ForarVy({driver,resor,setResor}){
   const fnamn=driver.namn.split(" ")[0];
   const ko=mina.filter(r=>!r.klassad);
   const klassadeN=mina.length-ko.length;
-  const tjmil=Math.round(mina.filter(r=>r.resetyp==="Tjänsteresa").reduce((s,r)=>s+r.avstandKm,0))/10;
+  const tjmil=Math.round(mina.filter(r=>r.resetyp==="Tjänsteresa" && r.klassad!==false).reduce((s,r)=>s+r.avstandKm,0))/10;
   const ers=Math.round(tjmil*25);
   const dm=(t)=>(""+t.getDate()).padStart(2,"0")+"."+(""+(t.getMonth()+1)).padStart(2,"0");
   const [minne,setMinne]=useState(()=>RUTTMINNE.load());
@@ -1819,7 +1819,7 @@ function ForarVy({driver,resor,setResor}){
   const platsNamn=(adr)=>{ const k=adr.split(",")[0]; return platser[k]||k; };
   const veckaResor=mina.filter(r=>(Date.now()-r.startTid)<7*864e5);
   const veckaKm=Math.round(veckaResor.reduce((s,r)=>s+r.avstandKm,0));
-  const veckaErs=Math.round(veckaResor.filter(r=>r.resetyp==="Tjänsteresa").reduce((s,r)=>s+r.avstandKm,0)/10*25);
+  const veckaErs=Math.round(veckaResor.filter(r=>r.resetyp==="Tjänsteresa" && r.klassad!==false).reduce((s,r)=>s+r.avstandKm,0)/10*25);
   const sista=mina[0];
   const anomalier=detekteraAvvikelser(mina).slice(0,3);
   const minEco=ecoScores(resor).find(e=>e.driver.id===driver.id);
@@ -1918,7 +1918,7 @@ function ForarVy({driver,resor,setResor}){
         </div>
         <Card className="p-4"><div className="flex items-center justify-between mb-1"><div className="font-semibold">{T("Reseräkning","Mileage report")}</div><span className="text-xs text-gray-400">juni 2026</span></div>
           <div className="text-sm text-gray-500 mb-3">{tjmil} mil · {kr(ers)} kr {T("ersättning","reimb.")} · {utlagg.length} {T("utlägg","expenses")} ({kr(Math.round(utlSum))} kr)</div>
-          <button onClick={()=>reserakningPDF(driver,mina.filter(r=>r.resetyp==="Tjänsteresa"),utlagg,tjmil,ers)} className="w-full py-2.5 rounded-lg font-semibold text-white" style={{background:"#0E1726"}}>{T("Skapa PDF-underlag","Create PDF")}</button></Card>
+          <button onClick={()=>reserakningPDF(driver,mina.filter(r=>r.resetyp==="Tjänsteresa" && r.klassad!==false),utlagg,tjmil,ers)} className="w-full py-2.5 rounded-lg font-semibold text-white" style={{background:"#0E1726"}}>{T("Skapa PDF-underlag","Create PDF")}</button></Card>
         <Card className="overflow-hidden"><div className="px-4 py-2 bg-gray-50 border-b text-sm font-semibold text-gray-700">{T("Mina utlägg","My expenses")}</div>
           <div className="divide-y">{utlagg.length===0?<div className="p-5 text-center text-sm text-gray-400">{T("Inga utlägg än. Fota ditt första kvitto!","No expenses yet. Scan your first receipt!")}</div>:utlagg.map(u=>(<div key={u.id} className="p-3 flex items-center justify-between text-sm"><div className="flex items-center gap-2 min-w-0">{u.bild&&<a href={u.bild} target="_blank" rel="noreferrer"><img src={u.bild} alt="kvitto" className="w-9 h-9 rounded object-cover border shrink-0"/></a>}<div className="min-w-0"><div className="font-medium">{u.kategori}</div><div className="text-xs text-gray-400">{new Date(u.datum).toLocaleDateString("sv-SE")}</div></div></div><div className="flex items-center gap-3"><span className="font-mono font-semibold">{u.belopp.toFixed(2)} kr</span><button onClick={()=>taUtlagg(u.id)} className="text-gray-300 hover:text-red-500">✕</button></div></div>))}</div></Card>
         {felrap.length>0&&<Card className="overflow-hidden"><div className="px-4 py-2 bg-gray-50 border-b text-sm font-semibold text-gray-700">{T("Skickade felrapporter","Sent reports")}</div><div className="divide-y">{felrap.map(f=>(<div key={f.id} className="p-3 text-sm flex gap-2">{f.bild&&<a href={f.bild} target="_blank" rel="noreferrer"><img src={f.bild} alt="skada" className="w-12 h-12 rounded object-cover border shrink-0"/></a>}<div className="min-w-0"><div className="font-medium">{f.typ}</div><div className="text-xs text-gray-400">{f.text||"—"} · {new Date(f.datum).toLocaleDateString("sv-SE")}</div>{f.plats&&f.plats.adress&&<div className="text-xs text-[#2F4BFF] truncate">📍 {f.plats.adress}</div>}</div></div>))}</div></Card>}

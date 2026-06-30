@@ -750,7 +750,7 @@ function Forare({resor}){
   </div>);
 }
 function DriverModal({driver,resor,onClose,onSave}){
-  const [f,setF]=useState({titel:"Förare",epost:"",mobil:"",rfidNr:"",kopplatFordonId:"",anstallningsnr:"",avdelning:"",korkortsklass:"B",korkortGiltigt:"",milersattning:"25",status:"aktiv",notiser:{epost:true,sms:false,push:true},...driver});
+  const [f,setF]=useState({titel:"Förare",epost:"",mobil:"",rfidNr:"",kopplatFordonId:"",anstallningsnr:"",avdelning:"",korkortsklass:"B",korkortGiltigt:"",biltyp:"egen",drivmedel:"bensin",milersattning:"25",status:"aktiv",notiser:{epost:true,sms:false,push:true},...driver});
   const [toast,setToast]=useState("");
   const up=(k,v)=>setF(s=>({...s,[k]:v}));
   const nt=(k)=>setF(s=>({...s,notiser:{...(s.notiser||{}),[k]:!(s.notiser||{})[k]}}));
@@ -792,7 +792,12 @@ function DriverModal({driver,resor,onClose,onSave}){
           </Sektion>
           <Sektion t="Ersättning & lön">
             <div className="grid grid-cols-2 gap-2"><input value={f.anstallningsnr} onChange={e=>up("anstallningsnr",e.target.value)} placeholder="Anställningsnr" className={inp}/><input value={f.avdelning} onChange={e=>up("avdelning",e.target.value)} placeholder="Avdelning / kostnadsställe" className={inp}/></div>
-            <div className="flex items-center gap-2"><span className="text-sm text-gray-500">Milersättning</span><input value={f.milersattning} onChange={e=>up("milersattning",e.target.value)} type="number" className="w-24 px-3 py-2 border rounded-lg text-sm"/><span className="text-sm text-gray-500">kr/mil</span></div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className={lbl+" block"}>Bil i tjänsten<select value={f.biltyp||"egen"} onChange={e=>{ const b=e.target.value; setF(s=>({...s,biltyp:b,milersattning:String(b==="egen"?25:((s.drivmedel||"bensin")==="el"?9.5:12))})); }} className={inp}><option value="egen">Egen bil</option><option value="forman">Förmånsbil (tjänstebil)</option></select></label>
+              {(f.biltyp==="forman")?<label className={lbl+" block"}>Drivmedel<select value={f.drivmedel||"bensin"} onChange={e=>{ const d=e.target.value; setF(s=>({...s,drivmedel:d,milersattning:String(d==="el"?9.5:12)})); }} className={inp}><option value="bensin">Bensin</option><option value="diesel">Diesel</option><option value="etanol">Etanol</option><option value="el">El</option></select></label>:<div/>}
+            </div>
+            <div className="flex items-center gap-2"><span className="text-sm text-gray-500">{f.biltyp==="forman"?"Drivmedelsersättning":"Milersättning"}</span><input value={f.milersattning} onChange={e=>up("milersattning",e.target.value)} type="number" step="0.5" className="w-24 px-3 py-2 border rounded-lg text-sm"/><span className="text-sm text-gray-500">kr/mil</span></div>
+            <div className="text-[11px] text-gray-400">{f.biltyp==="forman"?"Förmånsbil: ingen milersättning – drivmedelsschablon "+((f.drivmedel||"bensin")==="el"?"9,50":"12")+" kr/mil för tjänstekörning (2026). Privatkörning förmånsbeskattas.":"Egen bil i tjänst: skattefri milersättning 25 kr/mil (2026)."}</div>
           </Sektion>
           <Sektion t="Notiser">
             <div className="flex flex-wrap gap-3 text-sm">{[["epost","E-post"],["sms","SMS"],["push","Push i appen"]].map(([k,l])=>(<label key={k} className="flex items-center gap-2"><input type="checkbox" checked={!!(f.notiser||{})[k]} onChange={()=>nt(k)}/> {l}</label>))}</div>
@@ -1765,8 +1770,9 @@ function ForarVy({driver,resor,setResor}){
   const fnamn=driver.namn.split(" ")[0];
   const ko=mina.filter(r=>!r.klassad);
   const klassadeN=mina.length-ko.length;
+  const sats=Number(driver.milersattning)||25;
   const tjmil=Math.round(mina.filter(r=>r.resetyp==="Tjänsteresa" && r.klassad!==false).reduce((s,r)=>s+r.avstandKm,0))/10;
-  const ers=Math.round(tjmil*25);
+  const ers=Math.round(tjmil*sats);
   const dm=(t)=>(""+t.getDate()).padStart(2,"0")+"."+(""+(t.getMonth()+1)).padStart(2,"0");
   const [minne,setMinne]=useState(()=>RUTTMINNE.load());
   const [vy,setVy]=useState(()=>{ try{return localStorage.getItem("msp_forarvy");}catch(e){return null;} });
@@ -1819,7 +1825,7 @@ function ForarVy({driver,resor,setResor}){
   const platsNamn=(adr)=>{ const k=adr.split(",")[0]; return platser[k]||k; };
   const veckaResor=mina.filter(r=>(Date.now()-r.startTid)<7*864e5);
   const veckaKm=Math.round(veckaResor.reduce((s,r)=>s+r.avstandKm,0));
-  const veckaErs=Math.round(veckaResor.filter(r=>r.resetyp==="Tjänsteresa" && r.klassad!==false).reduce((s,r)=>s+r.avstandKm,0)/10*25);
+  const veckaErs=Math.round(veckaResor.filter(r=>r.resetyp==="Tjänsteresa" && r.klassad!==false).reduce((s,r)=>s+r.avstandKm,0)/10*sats);
   const sista=mina[0];
   const anomalier=detekteraAvvikelser(mina).slice(0,3);
   const minEco=ecoScores(resor).find(e=>e.driver.id===driver.id);

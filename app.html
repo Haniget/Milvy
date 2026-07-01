@@ -40,27 +40,27 @@ function randint(a,b){ return Math.floor(rnd()*(b-a+1))+a; }
 function pad(n){ return String(n).padStart(2,"0"); }
 const fmtDatum = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
 
-const ORG = { id:"o1", namn:"Creative Consulting X AB", orgnr:"5594990185", adress:"Sigurdsgatan 21", postnr:"721 30", postort:"Västerås" };
+const ORG = { id:"o1", namn:"Nordflotta Demo AB", orgnr:"556000-0000", adress:"Demogatan 1", postnr:"111 22", postort:"Stockholm" };
 const idag = new Date("2026-06-26T20:00:00");
 const ADRESSER = [
-  { a:"Sigurdsgatan 21, 721 30 Västerås", lat:59.6105, lng:16.5448 },
-  { a:"Stentorpsgatan 14D, 723 43 Västerås", lat:59.6262, lng:16.5102 },
-  { a:"Föreningsgatan 31, 722 17 Västerås", lat:59.6190, lng:16.5520 },
-  { a:"Stockholmsvägen 134, 721 34 Västerås", lat:59.6020, lng:16.5710 },
-  { a:"Kristiansborgsallén 4, 722 19 Västerås", lat:59.6155, lng:16.5360 },
-  { a:"Jakobsgatan 45, 724 64 Västerås", lat:59.6310, lng:16.5450 },
-  { a:"Skjulsta Kvarnväg 2, 632 29 Eskilstuna", lat:59.3620, lng:16.5400 },
-  { a:"Platinavägen 29, 632 34 Eskilstuna", lat:59.3700, lng:16.4950 },
-  { a:"Kungsgatan 12, 111 35 Stockholm", lat:59.3340, lng:18.0590 },
-  { a:"Sveavägen 44, 111 34 Stockholm", lat:59.3380, lng:18.0600 },
+  { a:"Demogatan 1, 111 22 Stockholm", lat:59.3326, lng:18.0649 },
+  { a:"Testvägen 12, 112 19 Stockholm", lat:59.3340, lng:18.0300 },
+  { a:"Exempelgatan 5, 118 20 Stockholm", lat:59.3160, lng:18.0700 },
+  { a:"Norra Ringvägen 8, 113 30 Stockholm", lat:59.3450, lng:18.0450 },
+  { a:"Södra Kajen 3, 116 45 Stockholm", lat:59.3050, lng:18.0850 },
+  { a:"Industrivägen 40, 121 30 Enskede", lat:59.2850, lng:18.0800 },
+  { a:"Hamnvägen 22, 111 47 Stockholm", lat:59.3320, lng:18.0680 },
+  { a:"Fabriksgatan 7, 171 65 Solna", lat:59.3600, lng:18.0010 },
+  { a:"Depågatan 2, 120 30 Stockholm", lat:59.2950, lng:18.0600 },
+  { a:"Skolvägen 9, 169 70 Solna", lat:59.3700, lng:17.9900 },
 ];
 const FAB = [
   ["Kia","Sportage","Crossover","Bensin,El"],["Kia","Niro","Crossover","Hybrid"],
   ["Volkswagen","ID.4","SUV","El"],["Skoda","Superb","Kombi","Diesel"],
   ["Mercedes-Benz","E 300DE","Sedan","Laddhybrid"],["Volvo","V60","Kombi","Bensin"],
 ];
-const NAMN = ["Nadia Österholm","Kawa Mohammadpour","Conny Isberg","Erik Nilsson","Leo Larsso",
-  "Magnus Wahlund","Niclas Rehnholm","Patrik Nilsson","Rickard Olsson","Tobias Nilsson","William Vallin","Ali Qeder"];
+const NAMN = ["Anna Andersson","Björn Berg","Cecilia Dahl","David Ek","Emma Falk",
+  "Fredrik Grön","Greta Holm","Hassan Ali","Ida Johansson","Johan Karlsson","Karin Lund","Lars Nyström"];
 const TITLAR = ["Förare","Förare","Förare","Projektledare","Administratör"];
 function regnr(){ const b="ABCDEFGHJKLMNPRSTUWXYZ"; return b[randint(0,21)]+b[randint(0,21)]+b[randint(0,21)]+randint(0,9)+randint(0,9)+b[randint(0,21)]; }
 
@@ -74,7 +74,7 @@ for (let i=0;i<12;i++){
     enhetId, status: rnd()>0.18 ? "aktiv":"offline",
     nastaBesiktning: fmtDatum(new Date(idag.getTime()+randint(-15,330)*86400000)) });
   FORARE.push({ id:"d"+i, namn:NAMN[i], titel:pick(TITLAR),
-    epost:NAMN[i].toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ /g,".")+"@creativenetworks.se",
+    epost:NAMN[i].toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ /g,".")+"@nordflotta-demo.se",
     mobil: rnd()>0.4 ? "07"+randint(10,39)+" "+randint(100000,999999):"",
     rfidNr: rnd()>0.5 ? String(randint(1000000,9999999)) : "", kopplatFordonId:"v"+i, organisation:ORG.namn });
   ENHETER.push({ id:"e"+i, enhetId, imei:"35687"+randint(1000000,9999999), modell:"FMC003", tillverkare:"Teltonika",
@@ -142,7 +142,7 @@ function zonAktivNu(z){
 }
 function zonBrott(z){ if(!zonAktivNu(z)) return []; return (z.objektIds||[]).filter(oid=>{ const o=ALLAOBJEKT.find(x=>x.id===oid); const p=objektPos(o); if(!p)return false; const inne=objektInne(z,p); return z.regel==="ej_in" ? inne : !inne; }); }
 function havKm(a,b){ const R=6371,toRad=d=>d*Math.PI/180; const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng); const s=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2; return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s)); }
-const ZONER_INIT=[{id:"z0",namn:"Arbetsområde Västerås",lat:59.6105,lng:16.5448,radieKm:3,regel:"stanna_inne",objektIds:["m1","m2","m3"]}];
+const ZONER_INIT=[{id:"z0",namn:"Depå Stockholm",lat:59.6105,lng:16.5448,radieKm:3,regel:"stanna_inne",objektIds:["m1","m2","m3"]}];
 
 /* ---- Förarbeteende, sensorer, tomgång, tillgångslarm, integrationer ---- */
 const HTYP=[["Hård inbromsning","inbromsning"],["Kraftig acceleration","acceleration"],["Skarp kurva","kurva"]];
@@ -177,22 +177,22 @@ const INTEGRATIONER_INIT=[
 ];
 /* ---- Bokning, reseregler, larm, admin ---- */
 let BOKNINGAR_INIT=[
-  {id:"bk1",fordonRegNr:FORDON[0].regNr,anvandare:"Conny Isberg",dag:fmtDatum(idag),fran:"08:00",till:"12:00",syfte:"Kundmöte Stockholm"},
-  {id:"bk2",fordonRegNr:FORDON[3].regNr,anvandare:"Magnus Wahlund",dag:fmtDatum(new Date(idag.getTime()+86400000)),fran:"09:00",till:"16:00",syfte:"Leverans Nacka"},
+  {id:"bk1",fordonRegNr:FORDON[0].regNr,anvandare:"Cecilia Dahl",dag:fmtDatum(idag),fran:"08:00",till:"12:00",syfte:"Kundmöte Stockholm"},
+  {id:"bk2",fordonRegNr:FORDON[3].regNr,anvandare:"Fredrik Grön",dag:fmtDatum(new Date(idag.getTime()+86400000)),fran:"09:00",till:"16:00",syfte:"Leverans Nacka"},
 ];
-let RESESYFTESREGLER_INIT=[{id:"rs1",villkor:"Stopp: Sigurdsgatan 21 (kontoret)",resesyfte:"Återresa till kontoret",resetyp:"Tjänsteresa"}];
+let RESESYFTESREGLER_INIT=[{id:"rs1",villkor:"Stopp: Demogatan 1 (kontoret)",resesyfte:"Återresa till kontoret",resetyp:"Tjänsteresa"}];
 let TIDSREGLER_INIT=[{id:"tr1",namn:"Kontorstid",fran:"08:00",till:"17:00",dagar:[1,2,3,4,5],inom:"Tjänsteresa",utanfor:"Privatresa"}];
-let MOTTAGARE_INIT=[{id:"mt1",namn:"Rickard Olsson",epost:"rickard@creativenetworks.se",typer:["Enhetslarm","Zonlarm","Hastighetslarm"]}];
+let MOTTAGARE_INIT=[{id:"mt1",namn:"Alex Lindqvist",epost:"alex@nordflotta-demo.se",typer:["Enhetslarm","Zonlarm","Hastighetslarm"]}];
 const ANVANDARLOGG=[
- {tid:"2026-06-26 09:14",anvandare:"Rickard Olsson",handling:"Exporterade körjournal H1 2026 till Skatteverket"},
- {tid:"2026-06-26 08:52",anvandare:"Rickard Olsson",handling:"Godkände 6 resor"},
- {tid:"2026-06-25 16:30",anvandare:"Nadia Österholm",handling:"Klassade 4 resor som Tjänst"},
- {tid:"2026-06-25 11:02",anvandare:"Magnus Wahlund",handling:"Bokade fordon "+FORDON[3].regNr},
- {tid:"2026-06-24 14:20",anvandare:"Rickard Olsson",handling:"Skapade zon \"Arbetsområde Västerås\""},
+ {tid:"2026-06-26 09:14",anvandare:"Alex Lindqvist",handling:"Exporterade körjournal H1 2026 till Skatteverket"},
+ {tid:"2026-06-26 08:52",anvandare:"Alex Lindqvist",handling:"Godkände 6 resor"},
+ {tid:"2026-06-25 16:30",anvandare:"Anna Andersson",handling:"Klassade 4 resor som Tjänst"},
+ {tid:"2026-06-25 11:02",anvandare:"Fredrik Grön",handling:"Bokade fordon "+FORDON[3].regNr},
+ {tid:"2026-06-24 14:20",anvandare:"Alex Lindqvist",handling:"Skapade zon \"Depå Stockholm\""},
  {tid:"2026-06-24 09:05",anvandare:"System",handling:"Enhet "+ENHETER[0].enhetId+" återansluten"},
 ];
 let ORGANISATIONER_INIT=[
- {id:"o1",namn:"Creative Consulting X AB",orgnr:"5594990185",parent:null,fordon:FORDON.length},
+ {id:"o1",namn:"Nordflotta Demo AB",orgnr:"556000-0000",parent:null,fordon:FORDON.length},
  {id:"o2",namn:"Creative Networks AB",orgnr:"556812-3344",parent:"o1",fordon:6},
  {id:"o3",namn:"CCX Entreprenad",orgnr:"559001-9921",parent:"o1",fordon:4},
 ];
@@ -227,7 +227,7 @@ for(let i=0;i<4;i++){ const v=pick(FORDON); const a=ADRESSER[randint(0,ADRESSER.
     allvar: rnd()>0.6?"hog":"medel", status:"Ny"}); }
 
 /* ---- Tankkortstransaktioner + GPS-matchning ---- */
-const STATIONER=[["OKQ8 Erikslund",3],["Circle K Hälla",5],["Preem Eskilstuna",6],["St1 Stentorp",1],["Shell Sveavägen",8],["OKQ8 Föreningsg.",2]];
+const STATIONER=[["OKQ8 Demogatan",3],["Circle K Testvägen",5],["Preem Industrivägen",6],["St1 Depågatan",1],["Shell Hamnvägen",8],["OKQ8 Solna",2]];
 let TANKKORT_INIT=[];
 const _fuelTrips=RESOR.filter(r=>r.avstandKm>3);
 for(let i=0;i<6;i++){ const r=_fuelTrips[i*3]; if(!r)continue;
@@ -320,7 +320,7 @@ function detekteraAvvikelser(resor){
   return out.sort((a,b)=>rank[b.allvar]-rank[a.allvar] || b.r.startTid-a.r.startTid);
 }
 function heurResesyfte(r){
-  const office="Sigurdsgatan", wd=r.startTid.getDay(), h=r.startTid.getHours();
+  const office="Demogatan", wd=r.startTid.getDay(), h=r.startTid.getHours();
   if(r.stoppAdress.includes(office)) return {resetyp:"Tjänsteresa",resesyfte:"Återresa till kontoret"};
   if(r.startAdress.includes(office)&&h>=8&&h<17) return {resetyp:"Tjänsteresa",resesyfte:"Kundbesök"};
   if(wd===0||wd===6) return {resetyp:"Privatresa",resesyfte:"Privat ärende"};
@@ -509,7 +509,7 @@ function Header({route,setRoute,openSettings,navOpen,setNavOpen,roll,setRoll}){
     {forare&&<div className="mt-2 pt-2 border-t border-[#25334C]">{["Fordon","Karta","Skatteverket-export"].map(l=>(<div key={l} className="flex items-center gap-2.5 px-2.5 py-2 text-[12.5px] text-[#3F4D66] cursor-not-allowed"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" strokeWidth="2"/><path d="M8 11V8a4 4 0 018 0v3" strokeWidth="2"/></svg>{l}</div>))}</div>}
     <div className="mt-auto pt-3 border-t border-[#25334C] flex items-center gap-2">
       <div className="w-7 h-7 rounded-full bg-[#2F4BFF] flex items-center justify-center font-semibold text-[11px] text-white">RO</div>
-      <div className="flex-1 min-w-0"><div className="text-[11px] font-semibold text-white truncate">Rickard Olsson</div><div className="font-mono text-[9px] text-[#8FA0B8]">Administratör</div></div>
+      <div className="flex-1 min-w-0"><div className="text-[11px] font-semibold text-white truncate">Alex Lindqvist</div><div className="font-mono text-[9px] text-[#8FA0B8]">Administratör</div></div>
       <button onClick={openSettings} title="Inställningar" className="p-1.5 text-[#8FA0B8] hover:text-white hover:bg-[#16233A] rounded-lg">{COG("w-4 h-4")}</button>
     </div>
   </aside>);
@@ -645,7 +645,7 @@ function Dashboard({resor,kvitton,incidenter,zoner,setRoute,openOnboarding}){
   const scol=(s)=>s>=80?"text-green-600":s>=60?"text-amber-600":"text-red-600";
   return (<div className="space-y-5">
     <div className="flex items-end justify-between flex-wrap gap-2">
-      <div><div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#8A93A0] mb-1">Översikt · {ORG.namn}</div><h1 className="text-[28px] font-extrabold text-[#0E1726] leading-none">Hej Rickard</h1></div>
+      <div><div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#8A93A0] mb-1">Översikt · {ORG.namn}</div><h1 className="text-[28px] font-extrabold text-[#0E1726] leading-none">Hej Alex</h1></div>
       <div className="font-mono text-[11px] text-[#8A93A0]">{fmtDatum(now)} · period 30 dagar</div>
     </div>
 
@@ -942,7 +942,7 @@ function Korjournal({resor,setResor,priv}){
   const maskad=(r)=> priv && r.resetyp==="Privatresa";
   const aiForeslaSyften=async()=>{ const utanSyfte=filt.filter(r=>!r.resesyfte.trim()); if(!utanSyfte.length){ setAiInfo("Alla filtrerade resor har redan resesyfte."); return; } setAiBusy(true); setAiInfo("");
     try{ if(AI.available()){ const lista=utanSyfte.slice(0,40).map(r=>({id:r.id,start:r.startAdress.split(",")[0],stopp:r.stoppAdress.split(",")[0],tid:fmtTid(r.startTid),dag:DAGAR[r.startTid.getDay()]}));
-      const sys="Du klassificerar bilresor för en svensk körjournal. Kontoret ligger på Sigurdsgatan 21, Västerås. Returnera ENDAST giltig JSON: array av {id, resetyp, resesyfte}. resetyp='Tjänsteresa' eller 'Privatresa', resesyfte=kort svensk fras.";
+      const sys="Du klassificerar bilresor för en svensk körjournal. Kontoret ligger på Demogatan 1, Stockholm. Returnera ENDAST giltig JSON: array av {id, resetyp, resesyfte}. resetyp='Tjänsteresa' eller 'Privatresa', resesyfte=kort svensk fras.";
       const ans=await AI.chat([{role:"user",content:"Klassificera:\n"+JSON.stringify(lista)}],sys,1500); const arr=extractJson(ans);
       if(Array.isArray(arr)){ arr.forEach(o=>{ if(o&&o.id) upd(o.id,{resetyp:o.resetyp||undefined,resesyfte:o.resesyfte||""}); }); setAiInfo("✓ AI föreslog syften för "+arr.length+" resor."); }
       else { utanSyfte.forEach(r=>upd(r.id,heurResesyfte(r))); setAiInfo("Tolkade ej AI-svar – använde heuristik."); }
@@ -1108,7 +1108,7 @@ function KvittoUpload({onClose,onAdd,openSettings}){
     <input type="file" accept="image/*" onChange={onFile} className={inp+" mb-2"}/>
     {img&&<img src={img} className="max-h-40 rounded border mb-2"/>}
     <label className="text-xs text-gray-500">…eller klistra in kvittotext</label>
-    <textarea value={text} onChange={e=>setText(e.target.value)} rows="3" placeholder="OKQ8 Västerås\n2026-06-20\nDiesel 612 kr\nABC12D" className={inp+" mb-3"}/>
+    <textarea value={text} onChange={e=>setText(e.target.value)} rows="3" placeholder="OKQ8 Stockholm\n2026-06-20\nDiesel 612 kr\nABC12D" className={inp+" mb-3"}/>
     <button onClick={las} disabled={busy||(!img&&!text.trim())} className="px-4 py-2 rounded-lg text-white text-sm disabled:opacity-50" style={{background:"#0E1726"}}>{busy?"Läser…":"Läs in"}</button>
     {err&&<div className="text-xs text-red-600 mt-2">{err}</div>}
     {res&&<div className="mt-4 border-t pt-3"><div className="text-sm font-semibold mb-2">AI tolkade:</div>
@@ -1692,7 +1692,7 @@ const SB={
   listIssues(){ return this._req("GET","vehicle_issues?select=*,vehicles(reg_nr),drivers(namn)&order=created_at.desc&limit=300"); },
   updateTrip(id,patch){ return this._req("PATCH","trips?id=eq."+id,patch); }
 };
-const KALENDER_KEYWORDS=[["kista","Möte med Kund AB"],["kungsgatan","Leverans City"],["nacka","Möte, Nacka"],["platinav","Materialhämtning"],["jakobsgatan","Kundbesök Jakobsgatan"]];
+const KALENDER_KEYWORDS=[["industrivägen","Materialhämtning"],["depågatan","Depåbesök"],["fabriksgatan","Leverans Fabriksgatan"],["testvägen","Kundbesök"],["hamnvägen","Möte hamnen"]];
 function kalenderSyfte(r){ const a=(r.stoppAdress+" "+r.startAdress).toLowerCase(); for(const [k,t] of KALENDER_KEYWORDS){ if(a.includes(k)) return t; } return null; }
 function reserakningPDF(driver,tjResor,utlagg,tjmil,ers){ const w=window.open("","_blank"); if(!w)return;
   const rad=tjResor.map(r=>"<tr><td>"+fmtDatum(r.startTid)+"</td><td>"+r.startAdress.split(",")[0]+" → "+r.stoppAdress.split(",")[0]+"</td><td style='text-align:right'>"+r.avstandKm+"</td><td>"+(r.resesyfte||"")+"</td></tr>").join("");

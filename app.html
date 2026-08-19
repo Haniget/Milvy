@@ -41,7 +41,7 @@ function pad(n){ return String(n).padStart(2,"0"); }
 const fmtDatum = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
 
 const ORG = { id:"o1", namn:"Nordflotta Demo AB", orgnr:"556000-0000", adress:"Demogatan 1", postnr:"111 22", postort:"Stockholm" };
-const idag = new Date("2026-06-26T20:00:00");
+const idag = new Date();
 const ADRESSER = [
   { a:"Demogatan 1, 111 22 Stockholm", lat:59.3326, lng:18.0649 },
   { a:"Testvägen 12, 112 19 Stockholm", lat:59.3340, lng:18.0300 },
@@ -740,7 +740,7 @@ function Forare({resor}){
   const [list,setList]=useState(FORARE);
   const [edit,setEdit]=useState(null);
   const ny=()=>setEdit({id:"d"+Date.now(),namn:"",titel:"Förare",epost:"",mobil:"",rfidNr:"",kopplatFordonId:"",organisation:ORG.namn,_ny:true});
-  const save=(d)=>{ setList(l=> l.some(x=>x.id===d.id)? l.map(x=>x.id===d.id?d:x) : [...l,d]); setEdit(null); try{ONB.ensure("flotta");}catch(e){} };
+  const save=async(d)=>{ if(SB.loggedIn()){ try{ const row={namn:d.namn,titel:d.titel,epost:d.epost,mobil:d.mobil||null,rfid_nr:d.rfidNr||null}; if(d._ny){ const c=SB.cfg(); const ins=await SB._req("POST","drivers",Object.assign({},row,{org_id:c.orgId})); if(ins&&ins[0]&&ins[0].id){ d=Object.assign({},d,{id:ins[0].id,_ny:false}); } } else { await SB.update("drivers",d.id,row); } if(d.kopplatFordonId&&String(d.kopplatFordonId).length>30){ await SB.update("vehicles",d.kopplatFordonId,{ansvarig_driver_id:d.id}).catch(()=>{}); } }catch(e){ alert("Kunde inte spara till databasen: "+(e.message||e)); } } setList(l=> l.some(x=>x.id===d.id)? l.map(x=>x.id===d.id?d:x) : [...l,d]); setEdit(null); try{ONB.ensure("flotta");}catch(e){} };
   return (<div className="space-y-4">
     <div className="flex justify-between items-center flex-wrap gap-2"><h1 className="text-xl font-bold text-gray-800">Föraröversikt</h1>
       <button onClick={ny} className="px-3 py-2 rounded-lg text-white text-sm font-medium" style={{background:"#0E1726"}}>+ Ny förare</button></div>
@@ -1685,6 +1685,16 @@ const SB={
   list(table){ return this._req("GET",table+"?select=*&order=created_at.desc"); },
   insert(table,row){ const c=this.cfg(); return this._req("POST",table,{...row,org_id:c.orgId,driver_id:c.driverId}); },
   remove(table,id){ return this._req("DELETE",table+"?id=eq."+id); },
+  update(table,id,patch){ return this._req("PATCH",table+"?id=eq."+id,patch); },
+  async hydrate(){ if(!this.loggedIn()) return false;
+    const [vs,ds,es]=await Promise.all([this._req("GET","vehicles?select=*"),this._req("GET","drivers?select=*"),this._req("GET","devices?select=*")]);
+    try{ const os=await this._req("GET","organisations?select=*&limit=1"); if(os&&os[0]) Object.assign(ORG,{namn:os[0].namn||ORG.namn,orgnr:os[0].orgnr||ORG.orgnr,adress:os[0].adress||ORG.adress,postnr:os[0].postnr||ORG.postnr,postort:os[0].postort||ORG.postort}); }catch(e){}
+    const posMap={}; try{ const ps=await this._req("GET","positions?select=vehicle_id,ts,lat,lng,speed,ignition&order=ts.desc&limit=300"); (ps||[]).forEach(p=>{ if(!posMap[p.vehicle_id]) posMap[p.vehicle_id]=p; }); }catch(e){}
+    FORDON.length=0; (vs||[]).forEach(v=>{ const dev=(es||[]).find(e=>e.vehicle_id===v.id)||{}; const drv=(ds||[]).find(d=>d.id===v.ansvarig_driver_id)||{}; const pos=posMap[v.id]||{};
+      FORDON.push({ id:v.id, regNr:v.reg_nr||"", fabrikat:v.fabrikat||"", modell:v.modell||"", fordonsklass:v.fordonsklass||"", drivmedel:v.drivmedel||"", fordonsar:v.fordonsar||"", farg:v.farg||"", vin:v.vin||"", matarstallningKm:v.matarstallning_km||0, kmIAr:v.km_i_ar||0, organisation:ORG.namn, fordonsansvarig:drv.namn||"–", enhetId:dev.enhet_id||"", status:v.status||"aktiv", nastaBesiktning:v.nasta_besiktning||"", lat:pos.lat, lng:pos.lng, ignition:pos.ignition===true, senastSedd:pos.ts||dev.last_seen||"" }); });
+    FORARE.length=0; (ds||[]).forEach(d=>{ const v=(vs||[]).find(x=>x.ansvarig_driver_id===d.id); FORARE.push({ id:d.id, namn:d.namn||"", titel:d.titel||"Förare", epost:d.epost||"", mobil:d.mobil||"", rfidNr:d.rfid_nr||"", kopplatFordonId:v?v.id:"", organisation:ORG.namn, status:d.aktiv===false?"inaktiv":"aktiv" }); });
+    ENHETER.length=0; (es||[]).forEach(e=>{ const v=(vs||[]).find(x=>x.id===e.vehicle_id)||{}; ENHETER.push({ id:e.id, enhetId:e.enhet_id||"", imei:e.imei||"", modell:e.modell||"", tillverkare:e.tillverkare||"", firmware:e.firmware||"", protokoll:e.protokoll||"", datakalla:e.datakalla||"flespi", senasteAnslutning:e.last_seen?String(e.last_seen).replace("T"," ").slice(0,16):"–", batteriV:e.battery_v||"", ignition:false, hardvara:((e.tillverkare||"")+" "+(e.modell||"")).trim(), dtc:[], regNr:v.reg_nr||"" }); });
+    return true; },
   removeBy(table,filter){ return this._req("DELETE",table+"?"+filter); },
   listTrips(){ const c=this.cfg(); return this._req("GET","trips?select=*,vehicles(reg_nr)&driver_id=eq."+c.driverId+"&order=start_tid.desc&limit=300"); },
   async uploadPhoto(dataUrl){ const c=this.cfg(); const res=await fetch(dataUrl); const blob=await res.blob(); const ext=((blob.type.split("/")[1])||"jpg").replace("jpeg","jpg"); const path=(c.driverId||"anon")+"/"+Date.now()+"-"+Math.random().toString(36).slice(2,8)+"."+ext; const r=await fetch(this.base()+"/storage/v1/object/milvy-photos/"+path,{method:"POST",headers:{apikey:c.anon,Authorization:"Bearer "+c.token,"Content-Type":blob.type||"image/jpeg"},body:blob}); if(!r.ok) throw new Error(await r.text()); return this.base()+"/storage/v1/object/public/milvy-photos/"+path; },
@@ -2000,8 +2010,26 @@ function DbConnectModal({onClose,onConnected}){
   </Card></div>);
 }
 
+const SB_DEFAULTS={url:"https://jmyfwgxfyeblfavduqig.supabase.co",anon:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpteWZ3Z3hmeWVibGZhdmR1cWlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NjkzMzIsImV4cCI6MjA5ODM0NTMzMn0.yDNsuZVezbETAAjq1z2iaxXPRb7CyENDdcrfpcKqsH8"};
+function LoginGate({onDone}){
+  const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [busy,setBusy]=useState(false); const [msg,setMsg]=useState("");
+  const logga=async()=>{ setBusy(true); setMsg(""); const c=SB.cfg(); SB.setCfg({...c,url:c.url||SB_DEFAULTS.url,anon:c.anon||SB_DEFAULTS.anon}); try{ await SB.signIn(email.trim(),pw); setPw(""); onDone(); }catch(e){ setMsg(String(e.message||e).slice(0,220)); } setBusy(false); };
+  return (<div className="min-h-screen flex items-center justify-center p-4" style={{background:"#0E1726"}}>
+    <div className="w-[380px] max-w-full bg-white rounded-2xl p-6 shadow-xl">
+      <div className="font-display font-black text-2xl mb-1">Milvy</div>
+      <p className="text-sm text-gray-500 mb-4">Logga in för att komma åt flottkontrollpanelen.</p>
+      <div className="space-y-2">
+        <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="E-post" autoComplete="username" className="w-full border rounded px-3 py-2 text-sm"/>
+        <input value={pw} onChange={e=>setPw(e.target.value)} type="password" placeholder="Lösenord" autoComplete="current-password" onKeyDown={e=>{if(e.key==="Enter")logga();}} className="w-full border rounded px-3 py-2 text-sm"/>
+        {msg&&<div className="text-xs text-red-600 break-words">{msg}</div>}
+        <button onClick={logga} disabled={busy} className="w-full py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60" style={{background:"#2F4BFF"}}>{busy?"Loggar in…":"Logga in"}</button>
+      </div>
+    </div>
+  </div>);
+}
 /* ============================ APP ============================ */
 function App(){
+  const [authed,setAuthed]=useState(()=>SB.loggedIn());
   const [route,setRoute]=useState({name:"oversikt"});
   const [resor,setResorRaw]=useState(()=>applyResorOv(RESOR));
   const [dbAdmin,setDbAdmin]=useState(false); const dbAdminRef=useRef(false); const [dbConnect,setDbConnect]=useState(false);
@@ -2015,10 +2043,10 @@ function App(){
         if(r.attesterad!==p.attesterad) patch.attesterad=r.attesterad;
         if(Object.keys(patch).length) SB.updateTrip(r.id,patch).catch(()=>{}); }); }
     return next; }); };
-  const laddaOrgResor=async()=>{ try{ const tr=await SB.listOrgTrips(); if(Array.isArray(tr)){ setResorRaw(tr.map(mapDbTrip)); setDbAdmin(true); dbAdminRef.current=true; } }catch(e){} };
+  const laddaOrgResor=async()=>{ try{ const tr=await SB.listOrgTrips(); if(Array.isArray(tr)){ setResorRaw(tr.map(mapDbTrip)); setDbAdmin(true); dbAdminRef.current=true; } }catch(e){} try{ if(await SB.hydrate()) setCfgVer(v=>v+1); }catch(e){} };
   const dbKoppla=()=>{ setDbConnect(false); laddaOrgResor(); };
-  const dbKopplaUt=()=>{ SB.signOut(); setDbAdmin(false); dbAdminRef.current=false; setResorRaw(applyResorOv(RESOR)); };
-  useEffect(()=>{ if(SB.loggedIn()&&SB.isAdmin()) laddaOrgResor(); },[]);
+  const dbKopplaUt=()=>{ SB.signOut(); setDbAdmin(false); dbAdminRef.current=false; setResorRaw(applyResorOv(RESOR)); setAuthed(false); };
+  useEffect(()=>{ if(!SB.loggedIn())return; if(SB.isAdmin()) laddaOrgResor(); else SB.hydrate().then(ok=>{ if(ok) setCfgVer(v=>v+1); }).catch(()=>{}); },[]);
   const [kvitton,setKvitton]=useState(()=>DB.load("kvitton",KVITTON_INIT));
   const [laddning,setLaddning]=useState(()=>DB.load("laddning",LADDNING_INIT));
   const [incidenter,setIncidenter]=useState(()=>DB.load("incidenter",INCIDENTER_INIT));
@@ -2039,6 +2067,7 @@ function App(){
   const closeSettings=(saved)=>{ setSettings(false); if(saved)setCfgVer(v=>v+1); };
   const S={resor,setResor,kvitton,setKvitton,laddning,setLaddning,incidenter,setIncidenter,zoner,setZoner,bokRegler,setBokRegler,openSettings,setRoute,route};
   const hubKey=route.name+"|"+(route.sub||"")+"|"+(route.vid||"");
+  if(!authed) return (<LoginGate onDone={()=>{ setAuthed(true); if(SB.isAdmin()) laddaOrgResor(); else SB.hydrate().then(ok=>{ if(ok) setCfgVer(v=>v+1); }).catch(()=>{}); }}/>);
   return (<div className="min-h-screen md:flex" key={cfgVer}>
     <Header route={route} setRoute={setRoute} openSettings={openSettings} navOpen={navOpen} setNavOpen={setNavOpen} roll={roll} setRoll={(r)=>{setRoll(r); setRoute(r==="forare"?{name:"forare_resor"}:{name:"oversikt"}); setNavOpen(false);}}/>
     {navOpen&&<div className="fixed inset-0 bg-black/40 z-[1150] md:hidden" onClick={()=>setNavOpen(false)}></div>}

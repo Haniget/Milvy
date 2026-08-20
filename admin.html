@@ -31,6 +31,7 @@
     <button data-vy="felanmalan" class="navbtn text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-200 hover:bg-white/10 w-full">Felanmälan</button>
     <button data-vy="buggar" class="navbtn text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-200 hover:bg-white/10 w-full">Kritiska buggar</button>
     <button data-vy="support" class="navbtn text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-200 hover:bg-white/10 w-full">Support & ärenden</button>
+    <button data-vy="rapporter" class="navbtn text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-200 hover:bg-white/10 w-full">Rapporter</button>
     <div class="md:mt-auto w-full"><button id="loggaUt" class="text-sm text-gray-500 hover:text-white px-3 py-2">Logga ut</button></div>
   </aside>
 
@@ -152,6 +153,28 @@
       </div>
     </section>
 
+    <section id="vy-rapporter" class="hidden">
+      <div class="flex gap-2 mb-4 flex-wrap">
+        <button class="px-3 py-1.5 rounded-lg text-sm font-medium" style="background:#C2F24D">SMS</button>
+        <button class="px-3 py-1.5 rounded-lg text-sm border border-white/20 text-gray-400 cursor-not-allowed" title="Kommer snart">Körjournal</button>
+        <button class="px-3 py-1.5 rounded-lg text-sm border border-white/20 text-gray-400 cursor-not-allowed" title="Kommer snart">Trafik</button>
+      </div>
+      <div class="bg-white rounded-2xl p-6 shadow-xl mb-4">
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+          <h2 class="font-display font-bold text-lg">SMS per kund</h2>
+          <div class="flex items-center gap-2"><input id="rapManad" type="month" class="border rounded px-2 py-1.5 text-sm"/><button id="rapUppdatera" class="text-sm text-blue-600">Uppdatera</button></div>
+        </div>
+        <div id="rapFel" class="text-xs text-red-600 hidden mb-2"></div>
+        <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-gray-400 border-b text-xs uppercase tracking-wide"><th class="py-2">Kund</th><th>Antal SMS</th><th>Inbjudn.</th><th>Zonlarm</th><th>Övrigt</th><th>Pris/SMS (kr)</th><th>Summa (kr)</th><th></th></tr></thead><tbody id="rapRader"><tr><td class="py-3 text-gray-400" colspan="8">Laddar…</td></tr></tbody>
+        <tfoot><tr class="border-t font-semibold"><td class="py-2">Totalt</td><td id="rapTotAntal">0</td><td colspan="4"></td><td id="rapTotSumma">0,00</td><td></td></tr></tfoot></table></div>
+        <div class="text-xs text-gray-400 mt-2">Priset sparas per kund när du ändrar det. Summan är exkl. moms. Misslyckade SMS debiteras inte.</div>
+      </div>
+      <div class="bg-white rounded-2xl p-6 shadow-xl">
+        <h2 class="font-display font-bold text-lg mb-3">Skapade fakturaunderlag</h2>
+        <div id="rapUnderlag" class="space-y-1 text-sm"><div class="text-gray-400">Laddar…</div></div>
+      </div>
+    </section>
+
   </main>
 </div>
 
@@ -173,12 +196,13 @@ function prioBadge(p){ var f={kritisk:"bg-red-100 text-red-700",hog:"bg-orange-1
 // Navigering
 document.querySelectorAll(".navbtn").forEach(function(b){ b.onclick=function(){
   document.querySelectorAll(".navbtn").forEach(function(x){x.classList.remove("aktiv");}); b.classList.add("aktiv");
-  ["nykund","kunder","felanmalan","buggar","support"].forEach(function(v){ $("vy-"+v).classList.toggle("hidden", v!==b.getAttribute("data-vy")); });
+  ["nykund","kunder","felanmalan","buggar","support","rapporter"].forEach(function(v){ $("vy-"+v).classList.toggle("hidden", v!==b.getAttribute("data-vy")); });
   var v=b.getAttribute("data-vy");
   if(v==="kunder"||v==="support") laddaKunder();
   if(v==="felanmalan") laddaIssues();
   if(v==="buggar") laddaBuggar();
   if(v==="support") laddaTickets();
+  if(v==="rapporter") laddaSmsRapport();
 }; });
 
 // Inloggning
@@ -287,6 +311,45 @@ $("kundkort").addEventListener("click",async function(e){ var zb=e.target.closes
   document.querySelectorAll(".kkF[data-id='"+id+"']").forEach(function(el){ patch[el.getAttribute("data-f")]=el.value; });
   b.textContent="Sparar…"; try{ await api({action:"vehicle_update",id:id,patch:patch}); b.textContent="Sparat ✓"; setTimeout(function(){b.textContent="Spara";},1500); }catch(err){ alert(err.message); b.textContent="Spara"; } });
 $("kundkort").addEventListener("change",async function(e){ var s=e.target.closest(".kkPuck"); if(!s)return; try{ await api({action:"device_assign",device_id:s.getAttribute("data-id"),vehicle_id:s.value||null}); }catch(err){ alert(err.message); } });
+// Rapporter: SMS
+async function apiRep(body){ var r=await fetch(URL_+"/functions/v1/admin-reports",{method:"POST",headers:{"Content-Type":"application/json","apikey":ANON,"Authorization":"Bearer "+token()},body:JSON.stringify(body)}); var j=await r.json().catch(function(){return {};}); if(!r.ok) throw new Error(j.error||("HTTP "+r.status)); return j; }
+var RAP_UNDERLAG={};
+function rapPeriod(){ var m=$("rapManad").value; if(!m){ m=new Date().toISOString().slice(0,7); $("rapManad").value=m; } var fran=m+"-01"; var d=new Date(m+"-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth()+2); d.setUTCDate(0); var sista=new Date(m+"-01T00:00:00Z"); sista.setUTCMonth(sista.getUTCMonth()+1); sista.setUTCDate(0); return [fran, sista.toISOString().slice(0,10)]; }
+function kr(n){ return (Math.round(n*100)/100).toFixed(2).replace(".", ","); }
+async function laddaSmsRapport(){ fel("rapFel",""); var p=rapPeriod();
+  try{ var j=await apiRep({action:"report_sms",fran:p[0],till:p[1]});
+    var totA=0, totS=0;
+    $("rapRader").innerHTML=(j.rader||[]).map(function(r){ totA+=r.antal; totS+=r.summa;
+      return "<tr class='border-b last:border-0'><td class='py-2 font-medium'>"+esc(r.namn)+"</td><td>"+r.antal+"</td><td class='text-gray-500'>"+r.inbjudan+"</td><td class='text-gray-500'>"+r.zonlarm+"</td><td class='text-gray-500'>"+r.ovrigt+"</td><td><input class='rapPris border rounded px-2 py-1 text-sm w-20' data-org='"+r.org_id+"' value='"+kr(r.sms_pris)+"'/></td><td class='font-semibold'>"+kr(r.summa)+"</td><td><button class='rapFakt text-xs border rounded px-2 py-1 hover:bg-gray-100 whitespace-nowrap' data-org='"+r.org_id+"'"+(r.antal===0?" disabled":"")+">Fakturaunderlag</button></td></tr>"; }).join("")||"<tr><td class='py-3 text-gray-400' colspan='8'>Inga kunder.</td></tr>";
+    $("rapTotAntal").textContent=totA; $("rapTotSumma").textContent=kr(totS);
+    var u=await apiRep({action:"fakturaunderlag_list"}); RAP_UNDERLAG={};
+    $("rapUnderlag").innerHTML=(u.underlag||[]).map(function(x){ RAP_UNDERLAG[x.id]=x;
+      return "<div class='border rounded-lg p-2 flex flex-wrap gap-2 items-center'><span class='font-medium'>"+esc((x.detaljer&&x.detaljer.kund&&x.detaljer.kund.namn)||"Kund")+"</span><span class='text-xs text-gray-500'>"+x.period_fran+" – "+x.period_till+" · "+x.antal+" SMS · "+kr(Number(x.summa))+" kr</span><span class='text-xs text-gray-400'>"+String(x.created_at||"").slice(0,10)+"</span><button class='rapVisa text-xs border rounded px-2 py-1 hover:bg-gray-100 ml-auto' data-id='"+x.id+"'>Visa / Skriv ut</button></div>"; }).join("")||"<div class='text-gray-400'>Inga fakturaunderlag skapade ännu.</div>";
+  }catch(e){ fel("rapFel",e.message); } }
+$("rapUppdatera").onclick=laddaSmsRapport;
+$("rapManad").addEventListener("change",laddaSmsRapport);
+$("rapRader").addEventListener("change",async function(e){ var i=e.target.closest(".rapPris"); if(!i)return; try{ await apiRep({action:"org_set_sms_pris",org_id:i.getAttribute("data-org"),pris:i.value}); laddaSmsRapport(); }catch(err){ alert(err.message); } });
+$("rapRader").addEventListener("click",async function(e){ var b=e.target.closest(".rapFakt"); if(!b)return; var p=rapPeriod(); b.textContent="Skapar…";
+  try{ var j=await apiRep({action:"fakturaunderlag_create",org_id:b.getAttribute("data-org"),fran:p[0],till:p[1]}); visaUnderlag(j.underlag); laddaSmsRapport(); }catch(err){ alert(err.message); b.textContent="Fakturaunderlag"; } });
+$("rapUnderlag").addEventListener("click",function(e){ var b=e.target.closest(".rapVisa"); if(!b)return; var u=RAP_UNDERLAG[b.getAttribute("data-id")]; if(u) visaUnderlag(u); });
+function visaUnderlag(u){ var k=(u.detaljer&&u.detaljer.kund)||{}; var pt=(u.detaljer&&u.detaljer.per_typ)||{}; var moms=Math.round(Number(u.summa)*25)/100; 
+  var rader=Object.keys(pt).map(function(t){ return "<tr><td style='padding:4px 12px 4px 0'>SMS – "+t+"</td><td style='text-align:right'>"+pt[t]+" st</td></tr>"; }).join("");
+  var w=window.open("","_blank");
+  w.document.write("<html><head><title>Fakturaunderlag</title></head><body style='font-family:sans-serif;max-width:640px;margin:40px auto'>"+
+   "<h2 style='margin-bottom:0'>Fakturaunderlag – SMS</h2><div style='color:#666;font-size:13px'>Skapat "+String(u.created_at||"").slice(0,10)+" · Underlag-ID "+u.id.slice(0,8)+"</div>"+
+   "<hr/><table style='width:100%;font-size:14px'><tr><td style='vertical-align:top'><b>Leverantör</b><br/>Abrova AB<br/>Milvy – Flotthantering</td>"+
+   "<td style='vertical-align:top'><b>Kund</b><br/>"+(k.namn||"")+"<br/>"+(k.orgnr?("Org.nr "+k.orgnr+"<br/>"):"")+(k.adress||"")+"<br/>"+((k.postnr||"")+" "+(k.postort||""))+"</td></tr></table>"+
+   "<p style='font-size:14px'><b>Period:</b> "+u.period_fran+" – "+u.period_till+"</p>"+
+   "<table style='width:100%;font-size:14px;border-top:1px solid #ccc;border-bottom:1px solid #ccc'>"+rader+
+   "<tr style='font-weight:bold'><td style='padding:6px 12px 6px 0'>Totalt antal SMS</td><td style='text-align:right'>"+u.antal+" st</td></tr></table>"+
+   "<table style='width:100%;font-size:14px;margin-top:12px'>"+
+   "<tr><td>À-pris per SMS</td><td style='text-align:right'>"+kr(Number(u.a_pris))+" kr</td></tr>"+
+   "<tr><td>Summa exkl. moms</td><td style='text-align:right'>"+kr(Number(u.summa))+" kr</td></tr>"+
+   "<tr><td>Moms 25 %</td><td style='text-align:right'>"+kr(moms)+" kr</td></tr>"+
+   "<tr style='font-weight:bold;font-size:16px'><td>Att fakturera</td><td style='text-align:right'>"+kr(Number(u.summa)+moms)+" kr</td></tr></table>"+
+   "<p style='color:#999;font-size:11px;margin-top:24px'>Genererat av Milvy Backoffice. Underlaget är loggat i systemet.</p>"+
+   "<script>window.print();</"+"script></body></html>");
+  w.document.close(); }
 if(token()){ visa(true); laddaKunder(); } else { visa(false); }
 </script>
 </body>

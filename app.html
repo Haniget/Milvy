@@ -2144,10 +2144,10 @@ function App(){
         if(r.attesterad!==p.attesterad) patch.attesterad=r.attesterad;
         if(Object.keys(patch).length) SB.updateTrip(r.id,patch).catch(()=>{}); }); }
     return next; }); };
-  const laddaOrgResor=async()=>{ try{ const tr=await SB.listOrgTrips(); if(Array.isArray(tr)){ setResorRaw(tr.map(mapDbTrip)); setDbAdmin(true); dbAdminRef.current=true; } }catch(e){} try{ if(await SB.hydrate()) setCfgVer(v=>v+1); }catch(e){} };
+  const laddaOrgResor=async()=>{ try{ const tr=await SB.listOrgTrips(); if(Array.isArray(tr)){ setResorRaw(tr.map(mapDbTrip)); setDbAdmin(true); dbAdminRef.current=true; } }catch(e){} try{ if(await SB.hydrate()){ setKvitton(DB.load("kvitton",[])); setLaddning(DB.load("laddning",[])); setIncidenter(DB.load("incidenter",[])); setZoner(DB.load("zoner",[])); setCfgVer(v=>v+1); } }catch(e){} };
   const dbKoppla=()=>{ setDbConnect(false); laddaOrgResor(); };
   const dbKopplaUt=()=>{ SB.signOut(); setDbAdmin(false); dbAdminRef.current=false; setResorRaw(applyResorOv(RESOR)); setAuthed(false); };
-  useEffect(()=>{ if(!SB.loggedIn())return; if(SB.isAdmin()) laddaOrgResor(); else SB.hydrate().then(ok=>{ if(ok) setCfgVer(v=>v+1); }).catch(()=>{}); },[]);
+  useEffect(()=>{ if(!SB.loggedIn())return; if(SB.isAdmin()) laddaOrgResor(); else SB.hydrate().then(ok=>{ if(ok){ setResorRaw(applyResorOv(RESOR)); setKvitton(DB.load("kvitton",[])); setLaddning(DB.load("laddning",[])); setIncidenter(DB.load("incidenter",[])); setZoner(DB.load("zoner",[])); setCfgVer(v=>v+1); } }).catch(()=>{}); },[]);
   const [kvitton,setKvitton]=useState(()=>DB.load("kvitton",KVITTON_INIT));
   const [laddning,setLaddning]=useState(()=>DB.load("laddning",LADDNING_INIT));
   const [incidenter,setIncidenter]=useState(()=>DB.load("incidenter",INCIDENTER_INIT));

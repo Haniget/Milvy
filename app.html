@@ -705,11 +705,47 @@ function AIDailyBrief({resor}){
 
 /* ============================ FORDON ============================ */
 function Fordon({setRoute}){
-  const [q,setQ]=useState(""); const list=FORDON.filter(v=>(v.regNr+v.fabrikat+v.modell).toLowerCase().includes(q.toLowerCase()));
-  return (<div className="space-y-4"><h1 className="text-xl font-bold text-gray-800">Fordon</h1>
+  const [q,setQ]=useState(""); const [edit,setEdit]=useState(null); const [ver,setVer]=useState(0);
+  const list=FORDON.filter(v=>(v.regNr+v.fabrikat+v.modell).toLowerCase().includes(q.toLowerCase()));
+  const db=SB.loggedIn();
+  return (<div className="space-y-4">
+    <div className="flex justify-between items-center flex-wrap gap-2"><h1 className="text-xl font-bold text-gray-800">Fordon</h1>
+      {db&&<button onClick={()=>setEdit({_ny:true,regNr:"",fabrikat:"",modell:"",fordonsar:"",matarstallningKm:"",ansvarigId:"",deviceId:""})} className="px-3 py-2 rounded-lg text-white text-sm font-medium" style={{background:"#0E1726"}}>+ Nytt fordon</button>}</div>
     <Card className="p-3"><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Sök reg nr, fabrikat eller modell…" className="w-full md:w-80 px-3 py-2 border rounded-lg text-sm"/></Card>
-    <Card className="overflow-hidden"><table className="w-full text-sm"><thead><tr className="text-left text-gray-500 bg-gray-50 border-b"><th className="px-4 py-2.5">Reg nr</th><th>Fabrikat</th><th>Modell</th><th>Drivmedel</th><th>År</th><th>Mätarst.</th><th>Ansvarig</th><th>Status</th></tr></thead>
-      <tbody>{list.map(v=>(<tr key={v.id} onClick={()=>setRoute({name:"fordon",id:v.id})} className="border-b last:border-0 hover:bg-blue-50 cursor-pointer"><td className="px-4 py-2.5 font-semibold text-blue-700">{v.regNr}</td><td>{v.fabrikat}</td><td>{v.modell}</td><td className="text-gray-500">{v.drivmedel}</td><td>{v.fordonsar}</td><td>{kr(v.matarstallningKm)} km</td><td>{v.fordonsansvarig}</td><td><Badge color={v.status==="aktiv"?"gron":"gra"}>{v.status}</Badge></td></tr>))}</tbody></table></Card></div>);
+    <Card className="overflow-hidden"><table className="w-full text-sm"><thead><tr className="text-left text-gray-500 bg-gray-50 border-b"><th className="px-4 py-2.5">Reg nr</th><th>Fabrikat</th><th>Modell</th><th>Drivmedel</th><th>År</th><th>Mätarst.</th><th>Ansvarig</th><th>Status</th>{db&&<th></th>}</tr></thead>
+      <tbody>{list.map(v=>(<tr key={v.id} onClick={()=>setRoute({name:"fordon",id:v.id})} className="border-b last:border-0 hover:bg-blue-50 cursor-pointer"><td className="px-4 py-2.5 font-semibold text-blue-700">{v.regNr}</td><td>{v.fabrikat}</td><td>{v.modell}</td><td className="text-gray-500">{v.drivmedel}</td><td>{v.fordonsar}</td><td>{kr(v.matarstallningKm)} km</td><td>{v.fordonsansvarig}</td><td><Badge color={v.status==="aktiv"?"gron":"gra"}>{v.status}</Badge></td>{db&&<td><button onClick={(e)=>{e.stopPropagation(); setEdit({id:v.id,regNr:v.regNr,fabrikat:v.fabrikat,modell:v.modell,fordonsar:v.fordonsar,matarstallningKm:v.matarstallningKm,ansvarigId:v.ansvarigId||"",deviceId:v.deviceId||"",_prevDevice:v.deviceId||""});}} className="px-3 py-1 rounded text-xs font-medium border hover:bg-gray-100">Redigera</button></td>}</tr>))}</tbody></table></Card>
+    {edit&&<FordonModal fordon={edit} onClose={()=>setEdit(null)} onSaved={()=>{setEdit(null); setVer(x=>x+1);}}/>}
+  </div>);
+}
+function FordonModal({fordon,onClose,onSaved}){
+  const [d,setD]=useState(fordon); const [busy,setBusy]=useState(false); const [msg,setMsg]=useState("");
+  const set=(k)=>(e)=>setD(x=>({...x,[k]:e.target.value}));
+  const spara=async()=>{ if(!d.regNr||!String(d.regNr).trim()){ setMsg("Reg.nr krävs."); return; } setBusy(true); setMsg("");
+    try{
+      const row={reg_nr:String(d.regNr).toUpperCase().replace(/\s+/g,""),fabrikat:d.fabrikat||null,modell:d.modell||null,fordonsar:d.fordonsar?parseInt(d.fordonsar,10):null,matarstallning_km:d.matarstallningKm?parseInt(String(d.matarstallningKm).replace(/\D/g,""),10):null,ansvarig_driver_id:d.ansvarigId||null};
+      let vid=d.id;
+      if(d._ny){ const c=SB.cfg(); const ins=await SB._req("POST","vehicles",Object.assign({},row,{org_id:c.orgId,status:"aktiv"})); vid=ins&&ins[0]&&ins[0].id; }
+      else { await SB.update("vehicles",vid,row); }
+      if(d.deviceId&&d.deviceId!==d._prevDevice){ await SB.update("devices",d.deviceId,{vehicle_id:vid}); }
+      else if(!d.deviceId&&d._prevDevice){ await SB.update("devices",d._prevDevice,{vehicle_id:null}); }
+      await SB.hydrate(); onSaved();
+    }catch(e){ setMsg("Kunde inte spara: "+(e.message||e)); }
+    setBusy(false); };
+  const lediga=ENHETER.filter(en=>!en.vehicleId||en.id===d._prevDevice);
+  return (<div className="fixed inset-0 bg-black/50 z-[2300] flex items-center justify-center p-4" onClick={onClose}><Card className="w-[460px] max-w-full p-5" onClick={e=>e.stopPropagation()}>
+    <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-lg">{d._ny?"Nytt fordon":"Redigera "+(d.regNr||"fordon")}</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button></div>
+    <div className="grid grid-cols-2 gap-2">
+      <input value={d.regNr||""} onChange={set("regNr")} placeholder="Reg.nr *" className="border rounded px-2 py-1.5 text-sm"/>
+      <input value={d.fordonsar||""} onChange={set("fordonsar")} placeholder="Årsmodell" className="border rounded px-2 py-1.5 text-sm"/>
+      <input value={d.fabrikat||""} onChange={set("fabrikat")} placeholder="Fabrikat" className="border rounded px-2 py-1.5 text-sm"/>
+      <input value={d.modell||""} onChange={set("modell")} placeholder="Modell" className="border rounded px-2 py-1.5 text-sm"/>
+      <input value={d.matarstallningKm||""} onChange={set("matarstallningKm")} placeholder="Mätarställning (km)" className="border rounded px-2 py-1.5 text-sm"/>
+      <select value={d.ansvarigId||""} onChange={set("ansvarigId")} className="border rounded px-2 py-1.5 text-sm bg-white"><option value="">Ansvarig förare…</option>{FORARE.map(f=>(<option key={f.id} value={f.id}>{f.namn}</option>))}</select>
+      <select value={d.deviceId||""} onChange={set("deviceId")} className="border rounded px-2 py-1.5 text-sm bg-white col-span-2"><option value="">Ingen puck kopplad</option>{lediga.map(en=>(<option key={en.id} value={en.id}>{(en.hardvara||"Puck")+" · IMEI "+en.imei+(en.regNr&&en.id!==d._prevDevice?" (på "+en.regNr+")":"")}</option>))}</select>
+    </div>
+    {msg&&<div className="text-xs text-red-600 mt-2">{msg}</div>}
+    <div className="flex gap-2 mt-4"><button disabled={busy} onClick={spara} className="px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-60" style={{background:"#0E1726"}}>{busy?"Sparar…":"Spara"}</button><button onClick={onClose} className="px-4 py-2 rounded-lg border text-sm">Avbryt</button></div>
+  </Card></div>);
 }
 function FordonDetalj({id,resor,setRoute}){
   const v=FORDON.find(x=>x.id===id); const e=ENHETER.find(x=>x.kopplatFordonId===id);
@@ -1698,9 +1734,9 @@ const SB={
     try{ const os=await this._req("GET","organisations?select=*&limit=1"); if(os&&os[0]) Object.assign(ORG,{namn:os[0].namn||ORG.namn,orgnr:os[0].orgnr||ORG.orgnr,adress:os[0].adress||ORG.adress,postnr:os[0].postnr||ORG.postnr,postort:os[0].postort||ORG.postort}); }catch(e){}
     const posMap={}; try{ const ps=await this._req("GET","positions?select=vehicle_id,ts,lat,lng,speed,ignition&order=ts.desc&limit=300"); (ps||[]).forEach(p=>{ if(!posMap[p.vehicle_id]) posMap[p.vehicle_id]=p; }); }catch(e){}
     FORDON.length=0; (vs||[]).forEach(v=>{ const dev=(es||[]).find(e=>e.vehicle_id===v.id)||{}; const drv=(ds||[]).find(d=>d.id===v.ansvarig_driver_id)||{}; const pos=posMap[v.id]||{};
-      FORDON.push({ id:v.id, regNr:v.reg_nr||"", fabrikat:v.fabrikat||"", modell:v.modell||"", fordonsklass:v.fordonsklass||"", drivmedel:v.drivmedel||"", fordonsar:v.fordonsar||"", farg:v.farg||"", vin:v.vin||"", matarstallningKm:v.matarstallning_km||0, kmIAr:v.km_i_ar||0, organisation:ORG.namn, fordonsansvarig:drv.namn||"–", enhetId:dev.enhet_id||"", status:v.status||"aktiv", nastaBesiktning:v.nasta_besiktning||"", lat:pos.lat, lng:pos.lng, ignition:pos.ignition===true, senastSedd:pos.ts||dev.last_seen||"" }); });
+      FORDON.push({ id:v.id, regNr:v.reg_nr||"", fabrikat:v.fabrikat||"", modell:v.modell||"", fordonsklass:v.fordonsklass||"", drivmedel:v.drivmedel||"", fordonsar:v.fordonsar||"", farg:v.farg||"", vin:v.vin||"", matarstallningKm:v.matarstallning_km||0, kmIAr:v.km_i_ar||0, organisation:ORG.namn, fordonsansvarig:drv.namn||"–", enhetId:dev.enhet_id||"", status:v.status||"aktiv", nastaBesiktning:v.nasta_besiktning||"", lat:pos.lat, lng:pos.lng, ignition:pos.ignition===true, senastSedd:pos.ts||dev.last_seen||"", ansvarigId:v.ansvarig_driver_id||"", deviceId:dev.id||"" }); });
     FORARE.length=0; (ds||[]).forEach(d=>{ const v=(vs||[]).find(x=>x.ansvarig_driver_id===d.id); FORARE.push({ id:d.id, namn:d.namn||"", titel:d.titel||"Förare", epost:d.epost||"", mobil:d.mobil||"", rfidNr:d.rfid_nr||"", kopplatFordonId:v?v.id:"", organisation:ORG.namn, status:d.aktiv===false?"inaktiv":"aktiv" }); });
-    ENHETER.length=0; (es||[]).forEach(e=>{ const v=(vs||[]).find(x=>x.id===e.vehicle_id)||{}; ENHETER.push({ id:e.id, enhetId:e.enhet_id||"", imei:e.imei||"", modell:e.modell||"", tillverkare:e.tillverkare||"", firmware:e.firmware||"", protokoll:e.protokoll||"", datakalla:e.datakalla||"flespi", senasteAnslutning:e.last_seen?String(e.last_seen).replace("T"," ").slice(0,16):"–", batteriV:e.battery_v||"", ignition:false, hardvara:((e.tillverkare||"")+" "+(e.modell||"")).trim(), dtc:[], regNr:v.reg_nr||"" }); });
+    ENHETER.length=0; (es||[]).forEach(e=>{ const v=(vs||[]).find(x=>x.id===e.vehicle_id)||{}; ENHETER.push({ id:e.id, enhetId:e.enhet_id||"", imei:e.imei||"", modell:e.modell||"", tillverkare:e.tillverkare||"", firmware:e.firmware||"", protokoll:e.protokoll||"", datakalla:e.datakalla||"flespi", senasteAnslutning:e.last_seen?String(e.last_seen).replace("T"," ").slice(0,16):"–", batteriV:e.battery_v||"", ignition:false, hardvara:((e.tillverkare||"")+" "+(e.modell||"")).trim(), dtc:[], regNr:v.reg_nr||"", vehicleId:e.vehicle_id||"" }); });
     return true; },
   removeBy(table,filter){ return this._req("DELETE",table+"?"+filter); },
   listTrips(){ const c=this.cfg(); return this._req("GET","trips?select=*,vehicles(reg_nr)&driver_id=eq."+c.driverId+"&order=start_tid.desc&limit=300"); },

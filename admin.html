@@ -74,6 +74,11 @@
         <div id="kundFel" class="text-xs text-red-600 hidden"></div>
         <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-gray-400 border-b text-xs uppercase tracking-wide"><th class="py-2">Företag</th><th>Org.nr</th><th>Ort</th><th>Medl.</th><th>Fordon</th><th>Resor</th><th>Skapad</th><th></th></tr></thead><tbody id="kundRader"><tr><td class="py-3 text-gray-400" colspan="8">Laddar…</td></tr></tbody></table></div>
       </div>
+      <div id="kundkort" class="hidden bg-white rounded-2xl p-6 shadow-xl">
+        <div class="flex items-center justify-between mb-3"><h2 class="font-display font-bold text-lg">Kundkort: <span id="kkTitel"></span></h2><button id="kkStang" class="text-sm text-gray-400 hover:text-gray-700">✕ Stäng</button></div>
+        <p class="text-sm text-gray-500 mb-3">Anslut puckar, komplettera fordonsdata och koppla puckar till fordon och förare — direkt åt kunden.</p>
+        <div id="kkInnehall"></div>
+      </div>
       <div class="bg-white rounded-2xl p-6 shadow-xl">
         <h2 class="font-display font-bold text-lg mb-1">Lägg till fordon & tracker</h2>
         <p class="text-sm text-gray-500 mb-4">Trackern skapas i Flespi och kopplas till dataströmmen automatiskt.</p>
@@ -182,13 +187,13 @@ $("loggaUt").onclick=function(){ setToken(""); visa(false); };
 
 // Kunder
 async function laddaKunder(){ fel("kundFel",""); try{ var j=await api({action:"list"});
-  var rows=(j.orgs||[]).map(function(o){ return "<tr class='border-b last:border-0'><td class='py-2 font-medium'>"+esc(o.namn)+"</td><td>"+esc(o.orgnr||"–")+"</td><td>"+esc(o.postort||"–")+"</td><td>"+o.medlemmar+"</td><td>"+o.fordon+"</td><td>"+o.resor+"</td><td class='text-gray-500'>"+String(o.created_at||"").slice(0,10)+"</td><td>"+(o.admin_epost?"<button class='impBtn text-xs border rounded px-2 py-1 hover:bg-gray-100 text-blue-600 whitespace-nowrap' data-epost='"+esc(o.admin_epost)+"'>Logga in →</button>":"")+"</td></tr>"; }).join("");
+  var rows=(j.orgs||[]).map(function(o){ return "<tr class='border-b last:border-0 hover:bg-gray-50 cursor-pointer kundRad' data-id='"+o.id+"' data-namn='"+esc(o.namn)+"'><td class='py-2 font-medium'>"+esc(o.namn)+"</td><td>"+esc(o.orgnr||"–")+"</td><td>"+esc(o.postort||"–")+"</td><td>"+o.medlemmar+"</td><td>"+o.fordon+"</td><td>"+o.resor+"</td><td class='text-gray-500'>"+String(o.created_at||"").slice(0,10)+"</td><td>"+(o.admin_epost?"<button class='impBtn text-xs border rounded px-2 py-1 hover:bg-gray-100 text-blue-600 whitespace-nowrap' data-epost='"+esc(o.admin_epost)+"'>Logga in →</button>":"")+"</td></tr>"; }).join("");
   $("kundRader").innerHTML=rows||"<tr><td class='py-3 text-gray-400' colspan='8'>Inga kunder ännu.</td></tr>";
   ["vOrg","tOrg"].forEach(function(sid){ var sel=$(sid); var cur=sel.value; sel.innerHTML="<option value=''>Välj kund…</option>"+(j.orgs||[]).map(function(o){return "<option value='"+o.id+"'>"+esc(o.namn||o.id)+"</option>";}).join(""); sel.value=cur; });
  }catch(e){ fel("kundFel",e.message); } }
 $("uppdatera").onclick=laddaKunder;
 async function impersonera(epost, btn, txt){ if(btn){btn.textContent="Öppnar…";} try{ var j=await api({action:"impersonate",email:epost}); window.open("https://www.milvy.se/app.html#impersonate="+encodeURIComponent(j.token_hash),"_blank"); }catch(e){ alert(e.message); } if(btn){btn.textContent=txt;} }
-$("kundRader").addEventListener("click",function(e){ var b=e.target.closest(".impBtn"); if(b) impersonera(b.getAttribute("data-epost"), b, "Logga in →"); });
+$("kundRader").addEventListener("click",function(e){ var b=e.target.closest(".impBtn"); if(b){ impersonera(b.getAttribute("data-epost"), b, "Logga in →"); return; } var tr=e.target.closest(".kundRad"); if(tr) oppnaKundkort(tr.getAttribute("data-id"), tr.getAttribute("data-namn")); });
 $("rImp").onclick=function(){ impersonera($("rEpost").textContent, this, "Logga in som kunden →"); };
 
 // Ny kund
@@ -243,6 +248,35 @@ $("trText").addEventListener("keydown",function(e){ if(e.key==="Enter")$("trSkic
 document.querySelectorAll(".stBtn").forEach(function(b){ b.onclick=async function(){ if(!valdTicket)return; try{ await api({action:"ticket_update",id:valdTicket,status:b.getAttribute("data-st")}); laddaTickets(); }catch(e){ alert(e.message); } }; });
 $("tSkapa").onclick=async function(){ fel("tFel",""); try{ if(!$("tOrg").value) throw new Error("Välj kund."); await api({action:"ticket_create",org_id:$("tOrg").value,titel:$("tTitel").value.trim()||"Meddelande från Milvy",text:$("tText").value.trim()}); $("tTitel").value="";$("tText").value=""; laddaTickets(); }catch(e){ fel("tFel",e.message); } };
 
+// Kundkort
+var kkOrg=null;
+async function oppnaKundkort(id, namn){ kkOrg=id; $("kundkort").classList.remove("hidden"); $("kkTitel").textContent=namn||""; $("kkInnehall").innerHTML="<div class='text-sm text-gray-400'>Laddar…</div>"; $("kundkort").scrollIntoView({behavior:"smooth"});
+  try{ var j=await api({action:"org_detail",org_id:id}); renderKundkort(j); }catch(e){ $("kkInnehall").innerHTML="<div class='text-sm text-red-600'>"+esc(e.message)+"</div>"; } }
+function renderKundkort(j){
+  var h="";
+  h+="<div class='text-xs font-semibold text-gray-400 uppercase mb-1'>Användare</div>";
+  h+="<div class='mb-4 text-sm'>"+((j.users||[]).map(function(u){return esc(u.email)+" <span class='text-xs text-gray-400'>("+esc(u.role)+")</span>";}).join(" · ")||"<span class='text-gray-400'>Inga</span>")+"</div>";
+  h+="<div class='text-xs font-semibold text-gray-400 uppercase mb-1'>Fordon</div>";
+  h+=((j.vehicles||[]).map(function(v){ return "<div class='border rounded-lg p-2 mb-2 grid sm:grid-cols-5 gap-2 items-center'>"+
+    "<input class='kkF border rounded px-2 py-1 text-sm' data-id='"+v.id+"' data-f='reg_nr' value='"+esc(v.reg_nr||"")+"' placeholder='Reg.nr'/>"+
+    "<input class='kkF border rounded px-2 py-1 text-sm' data-id='"+v.id+"' data-f='matarstallning_km' value='"+esc(v.matarstallning_km==null?"":v.matarstallning_km)+"' placeholder='Mätarställning km'/>"+
+    "<select class='kkF border rounded px-2 py-1 text-sm bg-white' data-id='"+v.id+"' data-f='ansvarig_driver_id'><option value=''>Förare…</option>"+(j.drivers||[]).map(function(d){return "<option value='"+d.id+"'"+(v.ansvarig_driver_id===d.id?" selected":"")+">"+esc(d.namn)+"</option>";}).join("")+"</select>"+
+    "<div class='text-xs text-gray-500'>Puck: "+esc(v.imei||"–")+"</div>"+
+    "<button class='kkSparaFordon text-xs border rounded px-2 py-1 hover:bg-gray-100' data-id='"+v.id+"'>Spara</button>"+
+    "</div>"; }).join("")||"<div class='text-sm text-gray-400 mb-2'>Inga fordon ännu.</div>");
+  h+="<div class='text-xs font-semibold text-gray-400 uppercase mb-1 mt-4'>Puckar</div>";
+  h+=((j.devices||[]).map(function(d){ return "<div class='border rounded-lg p-2 mb-2 flex flex-wrap gap-2 items-center text-sm'><span class='font-mono text-xs'>"+esc(d.imei)+"</span><span class='text-xs text-gray-400'>"+esc((d.tillverkare||"")+" "+(d.modell||""))+"</span><span class='text-xs text-gray-400'>"+(d.last_seen?("senast sedd "+String(d.last_seen).slice(0,16).replace("T"," ")):"aldrig sedd")+"</span>"+
+    "<select class='kkPuck border rounded px-2 py-1 text-sm bg-white ml-auto' data-id='"+d.id+"'><option value=''>Ej kopplad till fordon</option>"+(j.vehicles||[]).map(function(v){return "<option value='"+v.id+"'"+(d.vehicle_id===v.id?" selected":"")+">"+esc(v.reg_nr||v.id)+"</option>";}).join("")+"</select></div>"; }).join("")||"<div class='text-sm text-gray-400'>Inga puckar anslutna.</div>");
+  h+="<div class='mt-3 flex flex-wrap gap-2'><input id='kkImei' placeholder='Ny puck: IMEI (15 siffror)' class='border rounded px-2 py-1.5 text-sm flex-1 min-w-[200px]'/><button id='kkAnslut' class='px-3 py-1.5 rounded text-white text-sm' style='background:#0E1726'>Anslut puck</button></div><div id='kkSteg' class='text-xs text-gray-600 mt-2'></div>";
+  $("kkInnehall").innerHTML=h;
+  $("kkAnslut").onclick=async function(){ var imei=$("kkImei").value.trim(); if(!imei)return; this.textContent="Ansluter…"; this.disabled=true;
+    try{ var r=await api({action:"addVehicle",org_id:kkOrg,imei:imei}); oppnaKundkort(kkOrg,$("kkTitel").textContent); }catch(e){ alert(e.message); this.textContent="Anslut puck"; this.disabled=false; } };
+}
+$("kkStang").onclick=function(){ $("kundkort").classList.add("hidden"); };
+$("kundkort").addEventListener("click",async function(e){ var b=e.target.closest(".kkSparaFordon"); if(!b)return; var id=b.getAttribute("data-id"); var patch={};
+  document.querySelectorAll(".kkF[data-id='"+id+"']").forEach(function(el){ patch[el.getAttribute("data-f")]=el.value; });
+  b.textContent="Sparar…"; try{ await api({action:"vehicle_update",id:id,patch:patch}); b.textContent="Sparat ✓"; setTimeout(function(){b.textContent="Spara";},1500); }catch(err){ alert(err.message); b.textContent="Spara"; } });
+$("kundkort").addEventListener("change",async function(e){ var s=e.target.closest(".kkPuck"); if(!s)return; try{ await api({action:"device_assign",device_id:s.getAttribute("data-id"),vehicle_id:s.value||null}); }catch(err){ alert(err.message); } });
 if(token()){ visa(true); laddaKunder(); } else { visa(false); }
 </script>
 </body>

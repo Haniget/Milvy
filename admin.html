@@ -31,7 +31,7 @@
   <div id="panelVy" class="hidden">
     <div class="bg-white rounded-2xl p-6 shadow-xl mb-6">
       <h2 class="font-display font-bold text-lg mb-1">Registrera ny kund</h2>
-      <p class="text-sm text-gray-500 mb-4">Skapar organisation + admin-konto. Ett engångslösenord genereras och visas en gång.</p>
+      <p class="text-sm text-gray-500 mb-4">Skapar organisation + admin-konto, och valfritt första fordon med tracker (kopplas automatiskt till Flespi).</p>
       <div class="grid sm:grid-cols-2 gap-2">
         <input id="fNamn" placeholder="Företagsnamn *" class="border rounded px-3 py-2 text-sm"/>
         <input id="fOrgnr" placeholder="Org.nr" class="border rounded px-3 py-2 text-sm"/>
@@ -40,20 +40,44 @@
         <input id="fAdminNamn" placeholder="Kontaktperson (namn)" class="border rounded px-3 py-2 text-sm"/>
         <input id="fAdminEpost" placeholder="Admin-e-post *" class="border rounded px-3 py-2 text-sm"/>
       </div>
+      <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-4 mb-2">Fordon & tracker (valfritt)</div>
+      <div class="grid sm:grid-cols-2 gap-2">
+        <input id="fRegnr" placeholder="Reg.nr (t.ex. ABC123)" class="border rounded px-3 py-2 text-sm"/>
+        <input id="fImei" placeholder="Tracker IMEI (15 siffror)" class="border rounded px-3 py-2 text-sm"/>
+        <input id="fFabrikat" placeholder="Fabrikat (t.ex. Volvo)" class="border rounded px-3 py-2 text-sm"/>
+        <input id="fModell" placeholder="Modell (t.ex. V60)" class="border rounded px-3 py-2 text-sm"/>
+      </div>
       <div id="skapaFel" class="text-xs text-red-600 mt-2 hidden"></div>
       <button id="skapa" class="mt-3 px-4 py-2.5 rounded-lg text-sm font-medium" style="background:#C2F24D">Skapa kund</button>
       <div id="resultat" class="hidden mt-4 rounded-xl border-2 p-4" style="border-color:#C2F24D;background:#FAFFF0">
         <div class="font-semibold text-sm mb-1">✓ Kund skapad! Skicka dessa uppgifter till kunden:</div>
         <div class="text-sm">Inloggning: <a href="https://www.milvy.se/app.html" class="text-blue-600">milvy.se/app.html</a></div>
         <div class="text-sm">E-post: <span id="rEpost" class="font-mono"></span></div>
-        <div class="text-sm">Lösenord: <span id="rLosen" class="font-mono font-bold"></span> <button id="kopiera" class="ml-2 text-xs border rounded px-2 py-0.5 hover:bg-gray-100">Kopiera allt</button></div>
+        <div class="text-sm">Lösenord: <span id="rLosen" class="font-mono font-bold"></span> <button id="kopiera" class="ml-2 text-xs border rounded px-2 py-0.5 hover:bg-gray-100">Kopiera allt</button> <button id="rImp" class="ml-1 text-xs border rounded px-2 py-0.5 hover:bg-gray-100 text-blue-600">Logga in som kunden →</button></div>
+        <ul id="rSteg" class="text-xs text-gray-600 mt-2 list-disc ml-4"></ul>
         <div class="text-xs text-gray-500 mt-1">Lösenordet visas bara nu. Be kunden byta det vid första inloggning.</div>
       </div>
     </div>
+
+    <div class="bg-white rounded-2xl p-6 shadow-xl mb-6">
+      <h2 class="font-display font-bold text-lg mb-1">Lägg till fordon & tracker</h2>
+      <p class="text-sm text-gray-500 mb-4">Till en befintlig kund. Trackern skapas i Flespi och kopplas till dataströmmen automatiskt.</p>
+      <div class="grid sm:grid-cols-2 gap-2">
+        <select id="vOrg" class="border rounded px-3 py-2 text-sm bg-white"><option value="">Välj kund…</option></select>
+        <input id="vRegnr" placeholder="Reg.nr" class="border rounded px-3 py-2 text-sm"/>
+        <input id="vFabrikat" placeholder="Fabrikat" class="border rounded px-3 py-2 text-sm"/>
+        <input id="vModell" placeholder="Modell" class="border rounded px-3 py-2 text-sm"/>
+        <input id="vImei" placeholder="Tracker IMEI (15 siffror)" class="border rounded px-3 py-2 text-sm sm:col-span-2"/>
+      </div>
+      <div id="vFel" class="text-xs text-red-600 mt-2 hidden"></div>
+      <button id="vSkapa" class="mt-3 px-4 py-2.5 rounded-lg text-white text-sm font-medium" style="background:#0E1726">Lägg till</button>
+      <div id="vResultat" class="hidden mt-4 rounded-xl border p-3 bg-gray-50"><ul id="vSteg" class="text-xs text-gray-700 list-disc ml-4"></ul></div>
+    </div>
+
     <div class="bg-white rounded-2xl p-6 shadow-xl">
       <div class="flex items-center justify-between mb-3"><h2 class="font-display font-bold text-lg">Kunder</h2><button id="uppdatera" class="text-sm text-blue-600">Uppdatera</button></div>
       <div id="kundFel" class="text-xs text-red-600 hidden"></div>
-      <table class="w-full text-sm"><thead><tr class="text-left text-gray-400 border-b text-xs uppercase tracking-wide"><th class="py-2">Företag</th><th>Org.nr</th><th>Ort</th><th>Medl.</th><th>Fordon</th><th>Resor</th><th>Skapad</th></tr></thead><tbody id="kundRader"><tr><td class="py-3 text-gray-400" colspan="7">Laddar…</td></tr></tbody></table>
+      <table class="w-full text-sm"><thead><tr class="text-left text-gray-400 border-b text-xs uppercase tracking-wide"><th class="py-2">Företag</th><th>Org.nr</th><th>Ort</th><th>Medl.</th><th>Fordon</th><th>Resor</th><th>Skapad</th><th></th></tr></thead><tbody id="kundRader"><tr><td class="py-3 text-gray-400" colspan="8">Laddar…</td></tr></tbody></table>
     </div>
   </div>
 </div>
@@ -66,18 +90,32 @@ function setToken(t){ try{ t?sessionStorage.setItem("milvy_bo",t):sessionStorage
 function visa(inloggad){ $("loginVy").classList.toggle("hidden",inloggad); $("panelVy").classList.toggle("hidden",!inloggad); $("loggaUt").classList.toggle("hidden",!inloggad); }
 function fel(id,msg){ var el=$(id); if(!msg){el.classList.add("hidden");return;} el.textContent=msg; el.classList.remove("hidden"); }
 async function api(body){ var r=await fetch(URL_+"/functions/v1/admin-onboard",{method:"POST",headers:{"Content-Type":"application/json","apikey":ANON,"Authorization":"Bearer "+token()},body:JSON.stringify(body)}); var j=await r.json().catch(function(){return {};}); if(!r.ok) throw new Error(j.error||("HTTP "+r.status)); return j; }
-async function laddaKunder(){ fel("kundFel",""); try{ var j=await api({action:"list"}); var rows=(j.orgs||[]).map(function(o){ return "<tr class='border-b last:border-0'><td class='py-2 font-medium'>"+(o.namn||"")+"</td><td>"+(o.orgnr||"–")+"</td><td>"+(o.postort||"–")+"</td><td>"+o.medlemmar+"</td><td>"+o.fordon+"</td><td>"+o.resor+"</td><td class='text-gray-500'>"+String(o.created_at||"").slice(0,10)+"</td></tr>"; }).join(""); $("kundRader").innerHTML=rows||"<tr><td class='py-3 text-gray-400' colspan='7'>Inga kunder ännu.</td></tr>"; }catch(e){ if(String(e.message).indexOf("ogiltig")>-1||String(e.message).indexOf("saknar")>-1){ setToken(""); visa(false); } fel("kundFel",e.message); } }
+function visaSteg(ulId,steg){ var ul=$(ulId); ul.innerHTML=(steg||[]).map(function(s){return "<li>"+s+"</li>";}).join(""); }
+async function laddaKunder(){ fel("kundFel",""); try{ var j=await api({action:"list"}); var rows=(j.orgs||[]).map(function(o){ return "<tr class='border-b last:border-0'><td class='py-2 font-medium'>"+(o.namn||"")+"</td><td>"+(o.orgnr||"–")+"</td><td>"+(o.postort||"–")+"</td><td>"+o.medlemmar+"</td><td>"+o.fordon+"</td><td>"+o.resor+"</td><td class='text-gray-500'>"+String(o.created_at||"").slice(0,10)+"</td><td>"+(o.admin_epost?"<button class='impBtn text-xs border rounded px-2 py-1 hover:bg-gray-100 text-blue-600 whitespace-nowrap' data-epost='"+o.admin_epost+"'>Logga in →</button>":"")+"</td></tr>"; }).join(""); $("kundRader").innerHTML=rows||"<tr><td class='py-3 text-gray-400' colspan='8'>Inga kunder ännu.</td></tr>";
+  var sel=$("vOrg"); var cur=sel.value; sel.innerHTML="<option value=''>Välj kund…</option>"+(j.orgs||[]).map(function(o){return "<option value='"+o.id+"'>"+(o.namn||o.id)+"</option>";}).join(""); sel.value=cur;
+ }catch(e){ if(String(e.message).indexOf("ogiltig")>-1||String(e.message).indexOf("saknar")>-1){ setToken(""); visa(false); } fel("kundFel",e.message); } }
 $("loggaIn").onclick=async function(){ fel("loginFel",""); this.textContent="Loggar in…"; try{ var r=await fetch(URL_+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:ANON,"Content-Type":"application/json"},body:JSON.stringify({email:$("inEpost").value.trim(),password:$("inLosen").value})}); var j=await r.json(); if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||"Inloggning misslyckades."); setToken(j.access_token); $("inLosen").value=""; visa(true); laddaKunder(); }catch(e){ fel("loginFel",e.message); } this.textContent="Logga in"; };
 $("inLosen").addEventListener("keydown",function(e){ if(e.key==="Enter")$("loggaIn").click(); });
 $("loggaUt").onclick=function(){ setToken(""); visa(false); };
+$("uppdatera").onclick=laddaKunder;
 $("skapa").onclick=async function(){ fel("skapaFel",""); $("resultat").classList.add("hidden"); this.textContent="Skapar…"; this.disabled=true;
-  try{ var j=await api({action:"create",namn:$("fNamn").value.trim(),orgnr:$("fOrgnr").value.trim(),adress:$("fAdress").value.trim(),postnr:$("fPostnr").value.trim(),postort:$("fPostort").value.trim(),admin_namn:$("fAdminNamn").value.trim(),admin_epost:$("fAdminEpost").value.trim()});
-    $("rEpost").textContent=j.epost; $("rLosen").textContent=j.losenord; $("resultat").classList.remove("hidden");
-    ["fNamn","fOrgnr","fAdress","fPostnr","fPostort","fAdminNamn","fAdminEpost"].forEach(function(id){$(id).value="";});
+  try{ var j=await api({action:"create",namn:$("fNamn").value.trim(),orgnr:$("fOrgnr").value.trim(),adress:$("fAdress").value.trim(),postnr:$("fPostnr").value.trim(),postort:$("fPostort").value.trim(),admin_namn:$("fAdminNamn").value.trim(),admin_epost:$("fAdminEpost").value.trim(),fordon_regnr:$("fRegnr").value.trim(),fordon_fabrikat:$("fFabrikat").value.trim(),fordon_modell:$("fModell").value.trim(),tracker_imei:$("fImei").value.trim()});
+    $("rEpost").textContent=j.epost; $("rLosen").textContent=j.losenord; visaSteg("rSteg",j.steg); $("resultat").classList.remove("hidden");
+    ["fNamn","fOrgnr","fAdress","fPostnr","fPostort","fAdminNamn","fAdminEpost","fRegnr","fFabrikat","fModell","fImei"].forEach(function(id){$(id).value="";});
     laddaKunder();
   }catch(e){ fel("skapaFel",e.message); }
   this.textContent="Skapa kund"; this.disabled=false; };
+$("vSkapa").onclick=async function(){ fel("vFel",""); $("vResultat").classList.add("hidden"); this.textContent="Lägger till…"; this.disabled=true;
+  try{ var j=await api({action:"addVehicle",org_id:$("vOrg").value,regnr:$("vRegnr").value.trim(),fabrikat:$("vFabrikat").value.trim(),modell:$("vModell").value.trim(),imei:$("vImei").value.trim()});
+    visaSteg("vSteg",j.steg); $("vResultat").classList.remove("hidden");
+    ["vRegnr","vFabrikat","vModell","vImei"].forEach(function(id){$(id).value="";});
+    laddaKunder();
+  }catch(e){ fel("vFel",e.message); }
+  this.textContent="Lägg till"; this.disabled=false; };
 $("kopiera").onclick=function(){ var t="Milvy – inloggningsuppgifter\nApp: https://www.milvy.se/app.html\nE-post: "+$("rEpost").textContent+"\nLösenord: "+$("rLosen").textContent; navigator.clipboard.writeText(t); this.textContent="Kopierat ✓"; };
+async function impersonera(epost, btn, txt){ if(btn){btn.textContent="Öppnar…";} try{ var j=await api({action:"impersonate",email:epost}); window.open("https://www.milvy.se/app.html#impersonate="+encodeURIComponent(j.token_hash),"_blank"); }catch(e){ alert(e.message); } if(btn){btn.textContent=txt;} }
+$("kundRader").addEventListener("click",function(e){ var b=e.target.closest(".impBtn"); if(b) impersonera(b.getAttribute("data-epost"), b, "Logga in →"); });
+$("rImp").onclick=function(){ impersonera($("rEpost").textContent, this, "Logga in som kunden →"); };
 if(token()){ visa(true); laddaKunder(); } else { visa(false); }
 </script>
 </body>

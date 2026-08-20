@@ -1681,6 +1681,13 @@ const SB={
     if(!orgId) throw new Error("Inloggad, men kontot saknar koppling till en organisation (memberships). Be admin koppla dig.");
     this.setCfg({...c,token:j.access_token,uid:j.user&&j.user.id,driverId,orgId,role,email}); return true; },
   signOut(){ const c=this.cfg(); this.setCfg({url:c.url,anon:c.anon}); },
+  async signInWithHash(th){ const c=this.cfg(); const url=(c.url||SB_DEFAULTS.url).replace(/\/+$/,""); const anon=c.anon||SB_DEFAULTS.anon; this.setCfg({...c,url,anon});
+    const r=await fetch(url+"/auth/v1/verify",{method:"POST",headers:{apikey:anon,"Content-Type":"application/json"},body:JSON.stringify({type:"magiclink",token_hash:th})});
+    const j=await r.json(); if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||"Engångslänken är förbrukad eller ogiltig.");
+    let driverId=null,orgId=null,role=null;
+    try{ const m=await fetch(url+"/rest/v1/memberships?select=driver_id,org_id,role&limit=1",{headers:{apikey:anon,Authorization:"Bearer "+j.access_token}}); const ma=await m.json(); if(Array.isArray(ma)&&ma[0]){ driverId=ma[0].driver_id; orgId=ma[0].org_id; role=ma[0].role; } }catch(e){}
+    if(!orgId) throw new Error("Kontot saknar koppling till en organisation.");
+    this.setCfg({url,anon,token:j.access_token,uid:j.user&&j.user.id,driverId,orgId,role,email:j.user&&j.user.email}); return true; },
   async _req(method,path,body){ const c=this.cfg(); const r=await fetch(this.base()+"/rest/v1/"+path,{method,headers:{apikey:c.anon,Authorization:"Bearer "+c.token,"Content-Type":"application/json",Prefer:"return=representation"},body:body?JSON.stringify(body):undefined}); if(!r.ok) throw new Error(await r.text()); return method==="DELETE"?true:r.json(); },
   list(table){ return this._req("GET",table+"?select=*&order=created_at.desc"); },
   insert(table,row){ const c=this.cfg(); return this._req("POST",table,{...row,org_id:c.orgId,driver_id:c.driverId}); },
@@ -2013,6 +2020,7 @@ function DbConnectModal({onClose,onConnected}){
 const SB_DEFAULTS={url:"https://jmyfwgxfyeblfavduqig.supabase.co",anon:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpteWZ3Z3hmeWVibGZhdmR1cWlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NjkzMzIsImV4cCI6MjA5ODM0NTMzMn0.yDNsuZVezbETAAjq1z2iaxXPRb7CyENDdcrfpcKqsH8"};
 function LoginGate({onDone}){
   const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [busy,setBusy]=useState(false); const [msg,setMsg]=useState("");
+  useEffect(()=>{ const m=location.hash.match(/impersonate=([^&]+)/); if(m){ setBusy(true); SB.signInWithHash(decodeURIComponent(m[1])).then(()=>{ try{history.replaceState(null,"",location.pathname);}catch(e){} onDone(); }).catch(e=>{ setMsg(String(e.message||e)); setBusy(false); }); } },[]);
   const logga=async()=>{ setBusy(true); setMsg(""); const c=SB.cfg(); SB.setCfg({...c,url:c.url||SB_DEFAULTS.url,anon:c.anon||SB_DEFAULTS.anon}); try{ await SB.signIn(email.trim(),pw); setPw(""); onDone(); }catch(e){ setMsg(String(e.message||e).slice(0,220)); } setBusy(false); };
   return (<div className="min-h-screen flex items-center justify-center p-4" style={{background:"#0E1726"}}>
     <div className="w-[380px] max-w-full bg-white rounded-2xl p-6 shadow-xl">

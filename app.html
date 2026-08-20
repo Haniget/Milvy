@@ -2037,7 +2037,7 @@ function LoginGate({onDone}){
 }
 /* ============================ APP ============================ */
 function App(){
-  const [authed,setAuthed]=useState(()=>SB.loggedIn());
+  const [authed,setAuthed]=useState(()=>{ if(location.hash.indexOf("impersonate=")>-1){ try{SB.signOut();}catch(e){} return false; } return SB.loggedIn(); });
   const [route,setRoute]=useState({name:"oversikt"});
   const [resor,setResorRaw]=useState(()=>applyResorOv(RESOR));
   const [dbAdmin,setDbAdmin]=useState(false); const dbAdminRef=useRef(false); const [dbConnect,setDbConnect]=useState(false);

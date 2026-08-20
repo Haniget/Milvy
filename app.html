@@ -2017,6 +2017,58 @@ function DbConnectModal({onClose,onConnected}){
   </Card></div>);
 }
 
+function SupportChat(){
+  const [open,setOpen]=useState(false);
+  const [tickets,setTickets]=useState([]);
+  const [vald,setVald]=useState(null);
+  const [medd,setMedd]=useState([]);
+  const [text,setText]=useState("");
+  const [titel,setTitel]=useState("");
+  const [nyMode,setNyMode]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const ladda=async()=>{ try{ setTickets(await SB._req("GET","tickets?select=*&typ=eq.support&order=updated_at.desc")); }catch(e){} };
+  const laddaMedd=async(id)=>{ try{ setMedd(await SB._req("GET","ticket_messages?select=*&ticket_id=eq."+id+"&order=created_at.asc")); }catch(e){} };
+  useEffect(()=>{ if(open) ladda(); },[open]);
+  useEffect(()=>{ if(vald){ laddaMedd(vald.id); const t=setInterval(()=>laddaMedd(vald.id),20000); return ()=>clearInterval(t); } },[vald]);
+  if(!SB.loggedIn()) return null;
+  const skicka=async()=>{ if(!text.trim())return; setBusy(true); const c=SB.cfg();
+    try{
+      if(nyMode){ const t=await SB._req("POST","tickets",{org_id:c.orgId,typ:"support",titel:(titel.trim()||text.trim().slice(0,60)),skapad_av:c.uid}); const tk=t&&t[0];
+        await SB._req("POST","ticket_messages",{ticket_id:tk.id,org_id:c.orgId,roll:"kund",avsandare:c.email||"Kund",text:text.trim()});
+        setNyMode(false); setTitel(""); setText(""); await ladda(); setVald(tk); }
+      else if(vald){ await SB._req("POST","ticket_messages",{ticket_id:vald.id,org_id:c.orgId,roll:"kund",avsandare:c.email||"Kund",text:text.trim()}); setText(""); laddaMedd(vald.id); }
+    }catch(e){ alert("Kunde inte skicka: "+(e.message||e)); }
+    setBusy(false); };
+  const stNamn=(s)=>({ny:"Ny",pagaende:"Pågående",lost:"Löst",stangd:"Stängd"}[s]||s);
+  return (<div>
+    <button onClick={()=>setOpen(!open)} className="fixed bottom-5 right-5 z-[1300] rounded-full shadow-xl px-4 py-3 text-sm font-semibold" style={{background:"#C2F24D"}}>{open?"✕ Stäng":"💬 Support"}</button>
+    {open&&<div className="fixed bottom-20 right-5 z-[1300] w-[340px] max-w-[92vw] bg-white rounded-2xl shadow-2xl border flex flex-col" style={{height:"460px"}}>
+      <div className="px-4 py-3 border-b flex items-center justify-between"><span className="font-bold text-sm">Milvy Support</span>
+        <button onClick={()=>{setVald(null);setNyMode(true);}} className="text-xs text-[#2F4BFF] font-medium">+ Nytt ärende</button></div>
+      {!vald&&!nyMode&&<div className="flex-1 overflow-y-auto p-3 space-y-1">
+        {tickets.length===0&&<div className="text-xs text-gray-400 p-2">Inga ärenden ännu. Klicka på "+ Nytt ärende" för att kontakta oss.</div>}
+        {tickets.map(t=>(<button key={t.id} onClick={()=>setVald(t)} className="w-full text-left border rounded-lg p-2 hover:bg-gray-50">
+          <div className="text-sm font-medium truncate">{t.titel}</div>
+          <div className="text-[10px] text-gray-500">{stNamn(t.status)} · {String(t.updated_at||"").slice(0,16).replace("T"," ")}</div></button>))}
+      </div>}
+      {nyMode&&<div className="flex-1 p-3 space-y-2">
+        <input value={titel} onChange={e=>setTitel(e.target.value)} placeholder="Ämne" className="w-full border rounded px-2 py-1.5 text-sm"/>
+        <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="Beskriv ditt ärende…" rows={5} className="w-full border rounded px-2 py-1.5 text-sm"/>
+        <div className="flex gap-2"><button disabled={busy} onClick={skicka} className="px-3 py-1.5 rounded text-white text-sm disabled:opacity-60" style={{background:"#2F4BFF"}}>Skicka</button>
+        <button onClick={()=>setNyMode(false)} className="px-3 py-1.5 rounded border text-sm">Avbryt</button></div>
+      </div>}
+      {vald&&!nyMode&&<React.Fragment>
+        <div className="px-3 py-2 border-b flex items-center gap-2"><button onClick={()=>setVald(null)} className="text-xs text-gray-500">← Tillbaka</button><span className="text-sm font-medium truncate">{vald.titel}</span></div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {medd.map(m=>(<div key={m.id} className={"max-w-[85%] rounded-xl px-3 py-2 text-sm "+(m.roll==="kund"?"ml-auto text-white":"bg-gray-100")} style={m.roll==="kund"?{background:"#2F4BFF"}:{}}>
+            <div className="text-[10px] opacity-70">{m.roll==="kund"?"Du":"Milvy Support"}</div>{m.text}</div>))}
+        </div>
+        <div className="p-2 border-t flex gap-2"><input value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")skicka();}} placeholder="Skriv…" className="flex-1 border rounded px-2 py-1.5 text-sm"/>
+        <button disabled={busy} onClick={skicka} className="px-3 rounded text-white text-sm disabled:opacity-60" style={{background:"#2F4BFF"}}>➤</button></div>
+      </React.Fragment>}
+    </div>}
+  </div>);
+}
 const SB_DEFAULTS={url:"https://jmyfwgxfyeblfavduqig.supabase.co",anon:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpteWZ3Z3hmeWVibGZhdmR1cWlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NjkzMzIsImV4cCI6MjA5ODM0NTMzMn0.yDNsuZVezbETAAjq1z2iaxXPRb7CyENDdcrfpcKqsH8"};
 function LoginGate({onDone}){
   const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [busy,setBusy]=useState(false); const [msg,setMsg]=useState("");
@@ -2078,6 +2130,7 @@ function App(){
   if(!authed) return (<LoginGate onDone={()=>{ setAuthed(true); if(SB.isAdmin()) laddaOrgResor(); else SB.hydrate().then(ok=>{ if(ok) setCfgVer(v=>v+1); }).catch(()=>{}); }}/>);
   return (<div className="min-h-screen md:flex" key={cfgVer}>
     <Header route={route} setRoute={setRoute} openSettings={openSettings} navOpen={navOpen} setNavOpen={setNavOpen} roll={roll} setRoll={(r)=>{setRoll(r); setRoute(r==="forare"?{name:"forare_resor"}:{name:"oversikt"}); setNavOpen(false);}}/>
+    <SupportChat/>
     {navOpen&&<div className="fixed inset-0 bg-black/40 z-[1150] md:hidden" onClick={()=>setNavOpen(false)}></div>}
     <div className="flex-1 min-w-0 flex flex-col">
     <div className="md:hidden sticky top-0 z-[1100] flex items-center gap-3 h-12 px-4 text-white" style={{background:"#0E1726"}}>

@@ -8,103 +8,199 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;900&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>body{font-family:"IBM Plex Sans",sans-serif}.font-display{font-family:Archivo,sans-serif}</style>
+<style>body{font-family:"IBM Plex Sans",sans-serif}.font-display{font-family:Archivo,sans-serif}.navbtn.aktiv{background:#C2F24D;color:#0E1726}</style>
 </head>
 <body class="min-h-screen" style="background:#0E1726">
-<div class="max-w-4xl mx-auto px-4 py-10">
-  <div class="flex items-center justify-between mb-6">
-    <div><span class="font-display font-black text-2xl text-white">Milvy</span> <span class="text-sm text-gray-400 ml-2">Backoffice</span></div>
-    <button id="loggaUt" class="hidden text-sm text-gray-400 hover:text-white">Logga ut</button>
-  </div>
 
-  <div id="loginVy" class="max-w-sm mx-auto bg-white rounded-2xl p-6 shadow-xl mt-16">
-    <h1 class="font-display font-bold text-xl mb-1">Logga in</h1>
-    <p class="text-sm text-gray-500 mb-4">Endast för Milvy-teamet (owner-konto).</p>
-    <div class="space-y-2">
-      <input id="inEpost" placeholder="E-post" autocomplete="username" class="w-full border rounded px-3 py-2 text-sm"/>
-      <input id="inLosen" type="password" placeholder="Lösenord" autocomplete="current-password" class="w-full border rounded px-3 py-2 text-sm"/>
-      <div id="loginFel" class="text-xs text-red-600 hidden"></div>
-      <button id="loggaIn" class="w-full py-2.5 rounded-lg text-white text-sm font-medium" style="background:#2F4BFF">Logga in</button>
-    </div>
-  </div>
-
-  <div id="panelVy" class="hidden">
-    <div class="bg-white rounded-2xl p-6 shadow-xl mb-6">
-      <h2 class="font-display font-bold text-lg mb-1">Registrera ny kund</h2>
-      <p class="text-sm text-gray-500 mb-4">Skapar organisation + admin-konto, och valfritt första fordon med tracker (kopplas automatiskt till Flespi).</p>
-      <div class="grid sm:grid-cols-2 gap-2">
-        <input id="fNamn" placeholder="Företagsnamn *" class="border rounded px-3 py-2 text-sm"/>
-        <input id="fOrgnr" placeholder="Org.nr" class="border rounded px-3 py-2 text-sm"/>
-        <input id="fAdress" placeholder="Adress" class="border rounded px-3 py-2 text-sm"/>
-        <div class="grid grid-cols-2 gap-2"><input id="fPostnr" placeholder="Postnr" class="border rounded px-3 py-2 text-sm"/><input id="fPostort" placeholder="Postort" class="border rounded px-3 py-2 text-sm"/></div>
-        <input id="fAdminNamn" placeholder="Kontaktperson (namn)" class="border rounded px-3 py-2 text-sm"/>
-        <input id="fAdminEpost" placeholder="Admin-e-post *" class="border rounded px-3 py-2 text-sm"/>
-      </div>
-      <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-4 mb-2">Fordon & tracker (valfritt)</div>
-      <div class="grid sm:grid-cols-2 gap-2">
-        <input id="fRegnr" placeholder="Reg.nr (t.ex. ABC123)" class="border rounded px-3 py-2 text-sm"/>
-        <input id="fImei" placeholder="Tracker IMEI (15 siffror)" class="border rounded px-3 py-2 text-sm"/>
-        <input id="fFabrikat" placeholder="Fabrikat (t.ex. Volvo)" class="border rounded px-3 py-2 text-sm"/>
-        <input id="fModell" placeholder="Modell (t.ex. V60)" class="border rounded px-3 py-2 text-sm"/>
-      </div>
-      <div id="skapaFel" class="text-xs text-red-600 mt-2 hidden"></div>
-      <button id="skapa" class="mt-3 px-4 py-2.5 rounded-lg text-sm font-medium" style="background:#C2F24D">Skapa kund</button>
-      <div id="resultat" class="hidden mt-4 rounded-xl border-2 p-4" style="border-color:#C2F24D;background:#FAFFF0">
-        <div class="font-semibold text-sm mb-1">✓ Kund skapad! Skicka dessa uppgifter till kunden:</div>
-        <div class="text-sm">Inloggning: <a href="https://www.milvy.se/app.html" class="text-blue-600">milvy.se/app.html</a></div>
-        <div class="text-sm">E-post: <span id="rEpost" class="font-mono"></span></div>
-        <div class="text-sm">Lösenord: <span id="rLosen" class="font-mono font-bold"></span> <button id="kopiera" class="ml-2 text-xs border rounded px-2 py-0.5 hover:bg-gray-100">Kopiera allt</button> <button id="rImp" class="ml-1 text-xs border rounded px-2 py-0.5 hover:bg-gray-100 text-blue-600">Logga in som kunden →</button></div>
-        <ul id="rSteg" class="text-xs text-gray-600 mt-2 list-disc ml-4"></ul>
-        <div class="text-xs text-gray-500 mt-1">Lösenordet visas bara nu. Be kunden byta det vid första inloggning.</div>
-      </div>
-    </div>
-
-    <div class="bg-white rounded-2xl p-6 shadow-xl mb-6">
-      <h2 class="font-display font-bold text-lg mb-1">Lägg till fordon & tracker</h2>
-      <p class="text-sm text-gray-500 mb-4">Till en befintlig kund. Trackern skapas i Flespi och kopplas till dataströmmen automatiskt.</p>
-      <div class="grid sm:grid-cols-2 gap-2">
-        <select id="vOrg" class="border rounded px-3 py-2 text-sm bg-white"><option value="">Välj kund…</option></select>
-        <input id="vRegnr" placeholder="Reg.nr" class="border rounded px-3 py-2 text-sm"/>
-        <input id="vFabrikat" placeholder="Fabrikat" class="border rounded px-3 py-2 text-sm"/>
-        <input id="vModell" placeholder="Modell" class="border rounded px-3 py-2 text-sm"/>
-        <input id="vImei" placeholder="Tracker IMEI (15 siffror)" class="border rounded px-3 py-2 text-sm sm:col-span-2"/>
-      </div>
-      <div id="vFel" class="text-xs text-red-600 mt-2 hidden"></div>
-      <button id="vSkapa" class="mt-3 px-4 py-2.5 rounded-lg text-white text-sm font-medium" style="background:#0E1726">Lägg till</button>
-      <div id="vResultat" class="hidden mt-4 rounded-xl border p-3 bg-gray-50"><ul id="vSteg" class="text-xs text-gray-700 list-disc ml-4"></ul></div>
-    </div>
-
-    <div class="bg-white rounded-2xl p-6 shadow-xl">
-      <div class="flex items-center justify-between mb-3"><h2 class="font-display font-bold text-lg">Kunder</h2><button id="uppdatera" class="text-sm text-blue-600">Uppdatera</button></div>
-      <div id="kundFel" class="text-xs text-red-600 hidden"></div>
-      <table class="w-full text-sm"><thead><tr class="text-left text-gray-400 border-b text-xs uppercase tracking-wide"><th class="py-2">Företag</th><th>Org.nr</th><th>Ort</th><th>Medl.</th><th>Fordon</th><th>Resor</th><th>Skapad</th><th></th></tr></thead><tbody id="kundRader"><tr><td class="py-3 text-gray-400" colspan="8">Laddar…</td></tr></tbody></table>
-    </div>
+<div id="loginVy" class="max-w-sm mx-auto bg-white rounded-2xl p-6 shadow-xl mt-24">
+  <h1 class="font-display font-bold text-xl mb-1">Milvy Backoffice</h1>
+  <p class="text-sm text-gray-500 mb-4">Endast för Milvy-teamet (owner-konto).</p>
+  <div class="space-y-2">
+    <input id="inEpost" placeholder="E-post" autocomplete="username" class="w-full border rounded px-3 py-2 text-sm"/>
+    <input id="inLosen" type="password" placeholder="Lösenord" autocomplete="current-password" class="w-full border rounded px-3 py-2 text-sm"/>
+    <div id="loginFel" class="text-xs text-red-600 hidden"></div>
+    <button id="loggaIn" class="w-full py-2.5 rounded-lg text-white text-sm font-medium" style="background:#2F4BFF">Logga in</button>
   </div>
 </div>
+
+<div id="panelVy" class="hidden md:flex min-h-screen">
+  <aside class="md:w-56 shrink-0 p-4 flex md:flex-col gap-2 md:min-h-screen flex-wrap" style="background:#0A0F1A">
+    <div class="font-display font-black text-xl text-white mb-1 w-full">Milvy <span class="text-xs font-sans font-normal text-gray-400">Backoffice</span></div>
+    <button data-vy="nykund" class="navbtn aktiv text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-200 hover:bg-white/10 w-full">+ Ny kund</button>
+    <button data-vy="kunder" class="navbtn text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-200 hover:bg-white/10 w-full">Befintliga kunder</button>
+    <button data-vy="felanmalan" class="navbtn text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-200 hover:bg-white/10 w-full">Felanmälan</button>
+    <button data-vy="buggar" class="navbtn text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-200 hover:bg-white/10 w-full">Kritiska buggar</button>
+    <button data-vy="support" class="navbtn text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-200 hover:bg-white/10 w-full">Support & ärenden</button>
+    <div class="md:mt-auto w-full"><button id="loggaUt" class="text-sm text-gray-500 hover:text-white px-3 py-2">Logga ut</button></div>
+  </aside>
+
+  <main class="flex-1 p-4 md:p-8 max-w-5xl">
+
+    <section id="vy-nykund">
+      <div class="bg-white rounded-2xl p-6 shadow-xl">
+        <h2 class="font-display font-bold text-lg mb-1">Registrera ny kund</h2>
+        <p class="text-sm text-gray-500 mb-4">Organisation + admin-konto, och valfritt första fordon med tracker (kopplas automatiskt till Flespi).</p>
+        <div class="grid sm:grid-cols-2 gap-2">
+          <input id="fNamn" placeholder="Företagsnamn *" class="border rounded px-3 py-2 text-sm"/>
+          <input id="fOrgnr" placeholder="Org.nr" class="border rounded px-3 py-2 text-sm"/>
+          <input id="fAdress" placeholder="Adress" class="border rounded px-3 py-2 text-sm"/>
+          <div class="grid grid-cols-2 gap-2"><input id="fPostnr" placeholder="Postnr" class="border rounded px-3 py-2 text-sm"/><input id="fPostort" placeholder="Postort" class="border rounded px-3 py-2 text-sm"/></div>
+          <input id="fAdminNamn" placeholder="Kontaktperson (namn)" class="border rounded px-3 py-2 text-sm"/>
+          <input id="fAdminEpost" placeholder="Admin-e-post *" class="border rounded px-3 py-2 text-sm"/>
+        </div>
+        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-4 mb-2">Fordon & tracker (valfritt)</div>
+        <div class="grid sm:grid-cols-2 gap-2">
+          <input id="fRegnr" placeholder="Reg.nr (t.ex. ABC123)" class="border rounded px-3 py-2 text-sm"/>
+          <input id="fImei" placeholder="Tracker IMEI (15 siffror)" class="border rounded px-3 py-2 text-sm"/>
+          <input id="fFabrikat" placeholder="Fabrikat" class="border rounded px-3 py-2 text-sm"/>
+          <input id="fModell" placeholder="Modell" class="border rounded px-3 py-2 text-sm"/>
+        </div>
+        <div id="skapaFel" class="text-xs text-red-600 mt-2 hidden"></div>
+        <button id="skapa" class="mt-3 px-4 py-2.5 rounded-lg text-sm font-medium" style="background:#C2F24D">Skapa kund</button>
+        <div id="resultat" class="hidden mt-4 rounded-xl border-2 p-4" style="border-color:#C2F24D;background:#FAFFF0">
+          <div class="font-semibold text-sm mb-1">✓ Kund skapad! Skicka dessa uppgifter till kunden:</div>
+          <div class="text-sm">Inloggning: <a href="https://www.milvy.se/app.html" class="text-blue-600">milvy.se/app.html</a></div>
+          <div class="text-sm">E-post: <span id="rEpost" class="font-mono"></span></div>
+          <div class="text-sm">Lösenord: <span id="rLosen" class="font-mono font-bold"></span> <button id="kopiera" class="ml-2 text-xs border rounded px-2 py-0.5 hover:bg-gray-100">Kopiera allt</button> <button id="rImp" class="ml-1 text-xs border rounded px-2 py-0.5 hover:bg-gray-100 text-blue-600">Logga in som kunden →</button></div>
+          <ul id="rSteg" class="text-xs text-gray-600 mt-2 list-disc ml-4"></ul>
+          <div class="text-xs text-gray-500 mt-1">Lösenordet visas bara nu. Be kunden byta det vid första inloggning.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="vy-kunder" class="hidden space-y-6">
+      <div class="bg-white rounded-2xl p-6 shadow-xl">
+        <div class="flex items-center justify-between mb-3"><h2 class="font-display font-bold text-lg">Kunder</h2><button id="uppdatera" class="text-sm text-blue-600">Uppdatera</button></div>
+        <div id="kundFel" class="text-xs text-red-600 hidden"></div>
+        <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-gray-400 border-b text-xs uppercase tracking-wide"><th class="py-2">Företag</th><th>Org.nr</th><th>Ort</th><th>Medl.</th><th>Fordon</th><th>Resor</th><th>Skapad</th><th></th></tr></thead><tbody id="kundRader"><tr><td class="py-3 text-gray-400" colspan="8">Laddar…</td></tr></tbody></table></div>
+      </div>
+      <div class="bg-white rounded-2xl p-6 shadow-xl">
+        <h2 class="font-display font-bold text-lg mb-1">Lägg till fordon & tracker</h2>
+        <p class="text-sm text-gray-500 mb-4">Trackern skapas i Flespi och kopplas till dataströmmen automatiskt.</p>
+        <div class="grid sm:grid-cols-2 gap-2">
+          <select id="vOrg" class="border rounded px-3 py-2 text-sm bg-white"><option value="">Välj kund…</option></select>
+          <input id="vRegnr" placeholder="Reg.nr" class="border rounded px-3 py-2 text-sm"/>
+          <input id="vFabrikat" placeholder="Fabrikat" class="border rounded px-3 py-2 text-sm"/>
+          <input id="vModell" placeholder="Modell" class="border rounded px-3 py-2 text-sm"/>
+          <input id="vImei" placeholder="Tracker IMEI (15 siffror)" class="border rounded px-3 py-2 text-sm sm:col-span-2"/>
+        </div>
+        <div id="vFel" class="text-xs text-red-600 mt-2 hidden"></div>
+        <button id="vSkapa" class="mt-3 px-4 py-2.5 rounded-lg text-white text-sm font-medium" style="background:#0E1726">Lägg till</button>
+        <div id="vResultat" class="hidden mt-4 rounded-xl border p-3 bg-gray-50"><ul id="vSteg" class="text-xs text-gray-700 list-disc ml-4"></ul></div>
+      </div>
+    </section>
+
+    <section id="vy-felanmalan" class="hidden">
+      <div class="bg-white rounded-2xl p-6 shadow-xl">
+        <div class="flex items-center justify-between mb-3"><h2 class="font-display font-bold text-lg">Felanmälningar från kunder</h2><button id="issUppdatera" class="text-sm text-blue-600">Uppdatera</button></div>
+        <div id="issFel" class="text-xs text-red-600 hidden"></div>
+        <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-gray-400 border-b text-xs uppercase tracking-wide"><th class="py-2">Kund</th><th>Fordon</th><th>Typ</th><th>Beskrivning</th><th>Datum</th><th>Status</th></tr></thead><tbody id="issRader"><tr><td class="py-3 text-gray-400" colspan="6">Laddar…</td></tr></tbody></table></div>
+      </div>
+    </section>
+
+    <section id="vy-buggar" class="hidden">
+      <div class="bg-white rounded-2xl p-6 shadow-xl">
+        <div class="flex items-center justify-between mb-3"><h2 class="font-display font-bold text-lg">Buggar</h2><button id="bugUppdatera" class="text-sm text-blue-600">Uppdatera</button></div>
+        <div class="grid sm:grid-cols-4 gap-2 mb-2">
+          <input id="bTitel" placeholder="Titel *" class="border rounded px-3 py-2 text-sm sm:col-span-2"/>
+          <select id="bPrio" class="border rounded px-3 py-2 text-sm bg-white"><option value="kritisk">Kritisk</option><option value="hog">Hög</option><option value="normal" selected>Normal</option></select>
+          <button id="bSkapa" class="px-3 py-2 rounded-lg text-white text-sm font-medium" style="background:#0E1726">Lägg till bugg</button>
+        </div>
+        <textarea id="bBeskr" placeholder="Beskrivning" rows="2" class="w-full border rounded px-3 py-2 text-sm mb-3"></textarea>
+        <div id="bugFel" class="text-xs text-red-600 hidden mb-2"></div>
+        <div id="bugRader" class="space-y-2"><div class="text-gray-400 text-sm">Laddar…</div></div>
+      </div>
+    </section>
+
+    <section id="vy-support" class="hidden">
+      <div class="bg-white rounded-2xl p-6 shadow-xl mb-4">
+        <h2 class="font-display font-bold text-lg mb-2">Nytt ärende till kund</h2>
+        <div class="grid sm:grid-cols-3 gap-2">
+          <select id="tOrg" class="border rounded px-3 py-2 text-sm bg-white"><option value="">Välj kund…</option></select>
+          <input id="tTitel" placeholder="Ämne" class="border rounded px-3 py-2 text-sm"/>
+          <input id="tText" placeholder="Meddelande" class="border rounded px-3 py-2 text-sm"/>
+        </div>
+        <div id="tFel" class="text-xs text-red-600 mt-2 hidden"></div>
+        <button id="tSkapa" class="mt-2 px-4 py-2 rounded-lg text-white text-sm font-medium" style="background:#0E1726">Skicka</button>
+      </div>
+      <div class="grid md:grid-cols-5 gap-4">
+        <div class="md:col-span-2 bg-white rounded-2xl p-4 shadow-xl max-h-[560px] overflow-y-auto">
+          <div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-sm">Ärenden</h3><button id="tikUppdatera" class="text-xs text-blue-600">Uppdatera</button></div>
+          <div id="tikFel" class="text-xs text-red-600 hidden"></div>
+          <div id="tikLista" class="space-y-1"><div class="text-gray-400 text-sm">Laddar…</div></div>
+        </div>
+        <div class="md:col-span-3 bg-white rounded-2xl p-4 shadow-xl flex flex-col max-h-[560px]">
+          <div id="trHuvud" class="text-sm text-gray-400 mb-2">Välj ett ärende i listan.</div>
+          <div id="trMedd" class="flex-1 overflow-y-auto space-y-2 mb-2"></div>
+          <div id="trSvar" class="hidden">
+            <div class="flex gap-2">
+              <input id="trText" placeholder="Skriv svar…" class="flex-1 border rounded px-3 py-2 text-sm"/>
+              <button id="trSkicka" class="px-4 py-2 rounded-lg text-white text-sm font-medium" style="background:#2F4BFF">Skicka</button>
+            </div>
+            <div class="flex gap-2 mt-2">
+              <button data-st="lost" class="stBtn text-xs border rounded px-2 py-1 hover:bg-gray-100">Markera löst</button>
+              <button data-st="stangd" class="stBtn text-xs border rounded px-2 py-1 hover:bg-gray-100">Stäng</button>
+              <button data-st="pagaende" class="stBtn text-xs border rounded px-2 py-1 hover:bg-gray-100">Återöppna</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
 <script>
 var URL_="https://jmyfwgxfyeblfavduqig.supabase.co";
 var ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpteWZ3Z3hmeWVibGZhdmR1cWlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NjkzMzIsImV4cCI6MjA5ODM0NTMzMn0.yDNsuZVezbETAAjq1z2iaxXPRb7CyENDdcrfpcKqsH8";
 var $=function(id){return document.getElementById(id);};
+var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});};
 function token(){ try{return sessionStorage.getItem("milvy_bo")||"";}catch(e){return "";} }
 function setToken(t){ try{ t?sessionStorage.setItem("milvy_bo",t):sessionStorage.removeItem("milvy_bo"); }catch(e){} }
-function visa(inloggad){ $("loginVy").classList.toggle("hidden",inloggad); $("panelVy").classList.toggle("hidden",!inloggad); $("loggaUt").classList.toggle("hidden",!inloggad); }
+function visa(inloggad){ $("loginVy").classList.toggle("hidden",inloggad); $("panelVy").classList.toggle("hidden",!inloggad); $("panelVy").classList.toggle("md:flex",inloggad); }
 function fel(id,msg){ var el=$(id); if(!msg){el.classList.add("hidden");return;} el.textContent=msg; el.classList.remove("hidden"); }
-async function api(body){ var r=await fetch(URL_+"/functions/v1/admin-onboard",{method:"POST",headers:{"Content-Type":"application/json","apikey":ANON,"Authorization":"Bearer "+token()},body:JSON.stringify(body)}); var j=await r.json().catch(function(){return {};}); if(!r.ok) throw new Error(j.error||("HTTP "+r.status)); return j; }
-function visaSteg(ulId,steg){ var ul=$(ulId); ul.innerHTML=(steg||[]).map(function(s){return "<li>"+s+"</li>";}).join(""); }
-async function laddaKunder(){ fel("kundFel",""); try{ var j=await api({action:"list"}); var rows=(j.orgs||[]).map(function(o){ return "<tr class='border-b last:border-0'><td class='py-2 font-medium'>"+(o.namn||"")+"</td><td>"+(o.orgnr||"–")+"</td><td>"+(o.postort||"–")+"</td><td>"+o.medlemmar+"</td><td>"+o.fordon+"</td><td>"+o.resor+"</td><td class='text-gray-500'>"+String(o.created_at||"").slice(0,10)+"</td><td>"+(o.admin_epost?"<button class='impBtn text-xs border rounded px-2 py-1 hover:bg-gray-100 text-blue-600 whitespace-nowrap' data-epost='"+o.admin_epost+"'>Logga in →</button>":"")+"</td></tr>"; }).join(""); $("kundRader").innerHTML=rows||"<tr><td class='py-3 text-gray-400' colspan='8'>Inga kunder ännu.</td></tr>";
-  var sel=$("vOrg"); var cur=sel.value; sel.innerHTML="<option value=''>Välj kund…</option>"+(j.orgs||[]).map(function(o){return "<option value='"+o.id+"'>"+(o.namn||o.id)+"</option>";}).join(""); sel.value=cur;
- }catch(e){ if(String(e.message).indexOf("ogiltig")>-1||String(e.message).indexOf("saknar")>-1){ setToken(""); visa(false); } fel("kundFel",e.message); } }
+async function api(body){ var r=await fetch(URL_+"/functions/v1/admin-onboard",{method:"POST",headers:{"Content-Type":"application/json","apikey":ANON,"Authorization":"Bearer "+token()},body:JSON.stringify(body)}); var j=await r.json().catch(function(){return {};}); if(!r.ok){ if(r.status===401){setToken("");visa(false);} throw new Error(j.error||("HTTP "+r.status)); } return j; }
+function visaSteg(ulId,steg){ var ul=$(ulId); ul.innerHTML=(steg||[]).map(function(s){return "<li>"+esc(s)+"</li>";}).join(""); }
+function statusBadge(st){ var f={ny:"bg-blue-100 text-blue-700",pagaende:"bg-yellow-100 text-yellow-700",lost:"bg-green-100 text-green-700",stangd:"bg-gray-100 text-gray-500"}[st]||"bg-gray-100 text-gray-600"; var n={ny:"Ny",pagaende:"Pågående",lost:"Löst",stangd:"Stängd"}[st]||st; return "<span class='text-xs px-2 py-0.5 rounded-full "+f+"'>"+n+"</span>"; }
+function prioBadge(p){ var f={kritisk:"bg-red-100 text-red-700",hog:"bg-orange-100 text-orange-700",normal:"bg-gray-100 text-gray-600"}[p]||"bg-gray-100"; var n={kritisk:"KRITISK",hog:"Hög",normal:"Normal"}[p]||p; return "<span class='text-xs px-2 py-0.5 rounded-full font-semibold "+f+"'>"+n+"</span>"; }
+
+// Navigering
+document.querySelectorAll(".navbtn").forEach(function(b){ b.onclick=function(){
+  document.querySelectorAll(".navbtn").forEach(function(x){x.classList.remove("aktiv");}); b.classList.add("aktiv");
+  ["nykund","kunder","felanmalan","buggar","support"].forEach(function(v){ $("vy-"+v).classList.toggle("hidden", v!==b.getAttribute("data-vy")); });
+  var v=b.getAttribute("data-vy");
+  if(v==="kunder"||v==="support") laddaKunder();
+  if(v==="felanmalan") laddaIssues();
+  if(v==="buggar") laddaBuggar();
+  if(v==="support") laddaTickets();
+}; });
+
+// Inloggning
 $("loggaIn").onclick=async function(){ fel("loginFel",""); this.textContent="Loggar in…"; try{ var r=await fetch(URL_+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:ANON,"Content-Type":"application/json"},body:JSON.stringify({email:$("inEpost").value.trim(),password:$("inLosen").value})}); var j=await r.json(); if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||"Inloggning misslyckades."); setToken(j.access_token); $("inLosen").value=""; visa(true); laddaKunder(); }catch(e){ fel("loginFel",e.message); } this.textContent="Logga in"; };
 $("inLosen").addEventListener("keydown",function(e){ if(e.key==="Enter")$("loggaIn").click(); });
 $("loggaUt").onclick=function(){ setToken(""); visa(false); };
+
+// Kunder
+async function laddaKunder(){ fel("kundFel",""); try{ var j=await api({action:"list"});
+  var rows=(j.orgs||[]).map(function(o){ return "<tr class='border-b last:border-0'><td class='py-2 font-medium'>"+esc(o.namn)+"</td><td>"+esc(o.orgnr||"–")+"</td><td>"+esc(o.postort||"–")+"</td><td>"+o.medlemmar+"</td><td>"+o.fordon+"</td><td>"+o.resor+"</td><td class='text-gray-500'>"+String(o.created_at||"").slice(0,10)+"</td><td>"+(o.admin_epost?"<button class='impBtn text-xs border rounded px-2 py-1 hover:bg-gray-100 text-blue-600 whitespace-nowrap' data-epost='"+esc(o.admin_epost)+"'>Logga in →</button>":"")+"</td></tr>"; }).join("");
+  $("kundRader").innerHTML=rows||"<tr><td class='py-3 text-gray-400' colspan='8'>Inga kunder ännu.</td></tr>";
+  ["vOrg","tOrg"].forEach(function(sid){ var sel=$(sid); var cur=sel.value; sel.innerHTML="<option value=''>Välj kund…</option>"+(j.orgs||[]).map(function(o){return "<option value='"+o.id+"'>"+esc(o.namn||o.id)+"</option>";}).join(""); sel.value=cur; });
+ }catch(e){ fel("kundFel",e.message); } }
 $("uppdatera").onclick=laddaKunder;
+async function impersonera(epost, btn, txt){ if(btn){btn.textContent="Öppnar…";} try{ var j=await api({action:"impersonate",email:epost}); window.open("https://www.milvy.se/app.html#impersonate="+encodeURIComponent(j.token_hash),"_blank"); }catch(e){ alert(e.message); } if(btn){btn.textContent=txt;} }
+$("kundRader").addEventListener("click",function(e){ var b=e.target.closest(".impBtn"); if(b) impersonera(b.getAttribute("data-epost"), b, "Logga in →"); });
+$("rImp").onclick=function(){ impersonera($("rEpost").textContent, this, "Logga in som kunden →"); };
+
+// Ny kund
 $("skapa").onclick=async function(){ fel("skapaFel",""); $("resultat").classList.add("hidden"); this.textContent="Skapar…"; this.disabled=true;
   try{ var j=await api({action:"create",namn:$("fNamn").value.trim(),orgnr:$("fOrgnr").value.trim(),adress:$("fAdress").value.trim(),postnr:$("fPostnr").value.trim(),postort:$("fPostort").value.trim(),admin_namn:$("fAdminNamn").value.trim(),admin_epost:$("fAdminEpost").value.trim(),fordon_regnr:$("fRegnr").value.trim(),fordon_fabrikat:$("fFabrikat").value.trim(),fordon_modell:$("fModell").value.trim(),tracker_imei:$("fImei").value.trim()});
     $("rEpost").textContent=j.epost; $("rLosen").textContent=j.losenord; visaSteg("rSteg",j.steg); $("resultat").classList.remove("hidden");
     ["fNamn","fOrgnr","fAdress","fPostnr","fPostort","fAdminNamn","fAdminEpost","fRegnr","fFabrikat","fModell","fImei"].forEach(function(id){$(id).value="";});
-    laddaKunder();
   }catch(e){ fel("skapaFel",e.message); }
   this.textContent="Skapa kund"; this.disabled=false; };
+$("kopiera").onclick=function(){ var t="Milvy – inloggningsuppgifter\nApp: https://www.milvy.se/app.html\nE-post: "+$("rEpost").textContent+"\nLösenord: "+$("rLosen").textContent; navigator.clipboard.writeText(t); this.textContent="Kopierat ✓"; };
+
+// Fordon till befintlig kund
 $("vSkapa").onclick=async function(){ fel("vFel",""); $("vResultat").classList.add("hidden"); this.textContent="Lägger till…"; this.disabled=true;
   try{ var j=await api({action:"addVehicle",org_id:$("vOrg").value,regnr:$("vRegnr").value.trim(),fabrikat:$("vFabrikat").value.trim(),modell:$("vModell").value.trim(),imei:$("vImei").value.trim()});
     visaSteg("vSteg",j.steg); $("vResultat").classList.remove("hidden");
@@ -112,10 +208,41 @@ $("vSkapa").onclick=async function(){ fel("vFel",""); $("vResultat").classList.a
     laddaKunder();
   }catch(e){ fel("vFel",e.message); }
   this.textContent="Lägg till"; this.disabled=false; };
-$("kopiera").onclick=function(){ var t="Milvy – inloggningsuppgifter\nApp: https://www.milvy.se/app.html\nE-post: "+$("rEpost").textContent+"\nLösenord: "+$("rLosen").textContent; navigator.clipboard.writeText(t); this.textContent="Kopierat ✓"; };
-async function impersonera(epost, btn, txt){ if(btn){btn.textContent="Öppnar…";} try{ var j=await api({action:"impersonate",email:epost}); window.open("https://www.milvy.se/app.html#impersonate="+encodeURIComponent(j.token_hash),"_blank"); }catch(e){ alert(e.message); } if(btn){btn.textContent=txt;} }
-$("kundRader").addEventListener("click",function(e){ var b=e.target.closest(".impBtn"); if(b) impersonera(b.getAttribute("data-epost"), b, "Logga in →"); });
-$("rImp").onclick=function(){ impersonera($("rEpost").textContent, this, "Logga in som kunden →"); };
+
+// Felanmälan
+async function laddaIssues(){ fel("issFel",""); try{ var j=await api({action:"issues_list"});
+  var rows=(j.issues||[]).map(function(i){ return "<tr class='border-b last:border-0 align-top'><td class='py-2 font-medium'>"+esc(i.org_namn)+"</td><td>"+esc(i.reg_nr)+"</td><td>"+esc(i.type||"–")+"</td><td class='max-w-xs'>"+esc(i.description||"")+"</td><td class='text-gray-500 whitespace-nowrap'>"+String(i.created_at||"").slice(0,10)+"</td><td><select class='issSt border rounded px-1 py-0.5 text-xs bg-white' data-id='"+i.id+"'>"+["Ny","Mottagen","Åtgärdad"].map(function(s){return "<option"+(i.status===s?" selected":"")+">"+s+"</option>";}).join("")+"</select></td></tr>"; }).join("");
+  $("issRader").innerHTML=rows||"<tr><td class='py-3 text-gray-400' colspan='6'>Inga felanmälningar.</td></tr>";
+ }catch(e){ fel("issFel",e.message); } }
+$("issUppdatera").onclick=laddaIssues;
+$("issRader").addEventListener("change",async function(e){ var s=e.target.closest(".issSt"); if(!s)return; try{ await api({action:"issue_update",id:s.getAttribute("data-id"),status:s.value}); }catch(err){ alert(err.message); } });
+
+// Buggar
+async function laddaBuggar(){ fel("bugFel",""); try{ var j=await api({action:"bugs_list"});
+  var ordning={kritisk:0,hog:1,normal:2};
+  var list=(j.bugs||[]).sort(function(a,b){ return (ordning[a.prioritet]||9)-(ordning[b.prioritet]||9); });
+  $("bugRader").innerHTML=list.map(function(b){ return "<div class='border rounded-xl p-3 "+(b.prioritet==="kritisk"&&b.status!=="lost"?"border-red-300 bg-red-50":"")+"'><div class='flex items-center gap-2 flex-wrap'>"+prioBadge(b.prioritet)+statusBadge(b.status)+"<span class='font-medium text-sm'>"+esc(b.titel)+"</span><span class='text-xs text-gray-400 ml-auto'>"+String(b.created_at||"").slice(0,10)+"</span><select class='bugSt border rounded px-1 py-0.5 text-xs bg-white' data-id='"+b.id+"'>"+[["ny","Ny"],["pagaende","Pågående"],["lost","Löst"]].map(function(s){return "<option value='"+s[0]+"'"+(b.status===s[0]?" selected":"")+">"+s[1]+"</option>";}).join("")+"</select></div>"+(b.beskrivning?"<div class='text-xs text-gray-600 mt-1'>"+esc(b.beskrivning)+"</div>":"")+"</div>"; }).join("")||"<div class='text-gray-400 text-sm'>Inga buggar rapporterade.</div>";
+ }catch(e){ fel("bugFel",e.message); } }
+$("bugUppdatera").onclick=laddaBuggar;
+$("bSkapa").onclick=async function(){ fel("bugFel",""); try{ await api({action:"bug_create",titel:$("bTitel").value.trim(),beskrivning:$("bBeskr").value.trim(),prioritet:$("bPrio").value}); $("bTitel").value="";$("bBeskr").value=""; laddaBuggar(); }catch(e){ fel("bugFel",e.message); } };
+$("bugRader").addEventListener("change",async function(e){ var s=e.target.closest(".bugSt"); if(!s)return; try{ await api({action:"bug_update",id:s.getAttribute("data-id"),status:s.value}); laddaBuggar(); }catch(err){ alert(err.message); } });
+
+// Support / tickets
+var valdTicket=null;
+async function laddaTickets(){ fel("tikFel",""); try{ var j=await api({action:"tickets_list"});
+  $("tikLista").innerHTML=(j.tickets||[]).map(function(t){ return "<button class='tikBtn w-full text-left border rounded-lg p-2 hover:bg-gray-50 "+(valdTicket===t.id?"ring-2 ring-blue-400":"")+"' data-id='"+t.id+"' data-titel='"+esc(t.titel)+"' data-org='"+esc(t.org_namn)+"'><div class='flex items-center gap-2'>"+statusBadge(t.status)+"<span class='text-sm font-medium truncate'>"+esc(t.titel)+"</span></div><div class='text-xs text-gray-500'>"+esc(t.org_namn)+" · "+String(t.updated_at||"").slice(0,16).replace("T"," ")+"</div></button>"; }).join("")||"<div class='text-gray-400 text-sm'>Inga ärenden.</div>";
+ }catch(e){ fel("tikFel",e.message); } }
+$("tikUppdatera").onclick=laddaTickets;
+async function laddaTrad(){ if(!valdTicket)return; try{ var j=await api({action:"ticket_messages_list",ticket_id:valdTicket});
+  $("trMedd").innerHTML=(j.messages||[]).map(function(m){ var milvy=m.roll==="milvy"; return "<div class='max-w-[85%] rounded-xl px-3 py-2 text-sm "+(milvy?"ml-auto text-white":"bg-gray-100")+"' style='"+(milvy?"background:#2F4BFF":"")+"'><div class='text-[10px] opacity-70'>"+esc(m.avsandare||m.roll)+" · "+String(m.created_at||"").slice(5,16).replace("T"," ")+"</div>"+esc(m.text)+"</div>"; }).join("");
+  $("trMedd").scrollTop=$("trMedd").scrollHeight;
+ }catch(e){ alert(e.message); } }
+$("tikLista").addEventListener("click",function(e){ var b=e.target.closest(".tikBtn"); if(!b)return; valdTicket=b.getAttribute("data-id"); $("trHuvud").innerHTML="<span class='font-semibold'>"+b.getAttribute("data-titel")+"</span> <span class='text-gray-400'>· "+b.getAttribute("data-org")+"</span>"; $("trSvar").classList.remove("hidden"); laddaTickets(); laddaTrad(); });
+$("trSkicka").onclick=async function(){ var txt=$("trText").value.trim(); if(!txt||!valdTicket)return; this.disabled=true; try{ await api({action:"ticket_reply",ticket_id:valdTicket,text:txt}); $("trText").value=""; laddaTrad(); laddaTickets(); }catch(e){ alert(e.message); } this.disabled=false; };
+$("trText").addEventListener("keydown",function(e){ if(e.key==="Enter")$("trSkicka").click(); });
+document.querySelectorAll(".stBtn").forEach(function(b){ b.onclick=async function(){ if(!valdTicket)return; try{ await api({action:"ticket_update",id:valdTicket,status:b.getAttribute("data-st")}); laddaTickets(); }catch(e){ alert(e.message); } }; });
+$("tSkapa").onclick=async function(){ fel("tFel",""); try{ if(!$("tOrg").value) throw new Error("Välj kund."); await api({action:"ticket_create",org_id:$("tOrg").value,titel:$("tTitel").value.trim()||"Meddelande från Milvy",text:$("tText").value.trim()}); $("tTitel").value="";$("tText").value=""; laddaTickets(); }catch(e){ fel("tFel",e.message); } };
+
 if(token()){ visa(true); laddaKunder(); } else { visa(false); }
 </script>
 </body>

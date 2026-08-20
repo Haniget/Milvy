@@ -508,8 +508,8 @@ function Header({route,setRoute,openSettings,navOpen,setNavOpen,roll,setRoll}){
     </nav>
     {forare&&<div className="mt-2 pt-2 border-t border-[#25334C]">{["Fordon","Karta","Skatteverket-export"].map(l=>(<div key={l} className="flex items-center gap-2.5 px-2.5 py-2 text-[12.5px] text-[#3F4D66] cursor-not-allowed"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" strokeWidth="2"/><path d="M8 11V8a4 4 0 018 0v3" strokeWidth="2"/></svg>{l}</div>))}</div>}
     <div className="mt-auto pt-3 border-t border-[#25334C] flex items-center gap-2">
-      <div className="w-7 h-7 rounded-full bg-[#2F4BFF] flex items-center justify-center font-semibold text-[11px] text-white">RO</div>
-      <div className="flex-1 min-w-0"><div className="text-[11px] font-semibold text-white truncate">Alex Lindqvist</div><div className="font-mono text-[9px] text-[#8FA0B8]">Administratör</div></div>
+      <div className="w-7 h-7 rounded-full bg-[#2F4BFF] flex items-center justify-center font-semibold text-[11px] text-white">{((SB.cfg().email||"M").charAt(0)||"M").toUpperCase()}</div>
+      <div className="flex-1 min-w-0"><div className="text-[11px] font-semibold text-white truncate">{(FORARE.find(f=>f.id===SB.cfg().driverId)||{}).namn||SB.cfg().email||"Inloggad"}</div><div className="font-mono text-[9px] text-[#8FA0B8]">{({owner:"Ägare",admin:"Administratör",forare:"Förare",projektledare:"Projektledare",aterforsaljare:"Återförsäljare"})[SB.cfg().role]||"Användare"}</div></div>
       <button onClick={openSettings} title="Inställningar" className="p-1.5 text-[#8FA0B8] hover:text-white hover:bg-[#16233A] rounded-lg">{COG("w-4 h-4")}</button>
     </div>
   </aside>);
@@ -892,8 +892,7 @@ function Karta({priv}){
   const centerLive=(d)=>{ if(!d.active)return; setSel("d"+d.id); map.current.setView([d.lat,d.lng],13); markers.current["d"+d.id]&&markers.current["d"+d.id].openPopup(); };
   return (<div className="space-y-4">
     <div className="flex items-center justify-between flex-wrap gap-2"><h1 className="text-xl font-bold text-gray-800">Aktuella positioner</h1>
-      <div className="flex items-center gap-2">{hasToken&&<button onClick={()=>setLive(!live)} className={"px-3 py-2 rounded-lg text-sm font-medium "+(live?"bg-green-600 text-white":"border")}>{live?"● Live (flespi)":"Visa live från flespi"}</button>}{live&&<button onClick={hamtaLive} className="px-3 py-2 rounded-lg border text-sm">↻ Uppdatera</button>}</div></div>
-    {!hasToken&&<div className="text-sm bg-amber-50 text-amber-800 rounded-lg px-3 py-2">Lägg in din flespi-token under kugghjulet för att visa riktiga fordon. Visar mockdata tills dess.</div>}
+      <div className="flex items-center gap-2">{hasToken&&<button onClick={()=>setLive(!live)} className={"px-3 py-2 rounded-lg text-sm font-medium "+(live?"bg-green-600 text-white":"border")}>{live?"● Live":"Visa livepositioner"}</button>}{live&&<button onClick={hamtaLive} className="px-3 py-2 rounded-lg border text-sm">↻ Uppdatera</button>}</div></div>
     {live&&status&&<div className="text-sm bg-gray-50 rounded-lg px-3 py-2">{status}</div>}
     <div className="grid md:grid-cols-[300px_1fr] gap-4">
       <Card className="p-3 h-[520px] overflow-auto">
@@ -2173,9 +2172,6 @@ function App(){
       <button onClick={()=>setNavOpen(true)} className="p-1"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       <span className="font-display font-bold">Milvy</span></div>
     <main className="max-w-[1180px] w-full mx-auto px-4 sm:px-6 py-6 pb-24">
-      {roll!=="forare"&&<div className="mb-4 flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm" style={{background:dbAdmin?"#ECFDF5":"#EEF1FF"}}>
-        <span className={dbAdmin?"text-green-800":"text-[#22356B]"}>{dbAdmin?"🟢 Ansluten till databasen – visar riktiga resor från Supabase":"Visar demodata (mock). Anslut databasen för riktiga resor."}</span>
-        {dbAdmin?<button onClick={dbKopplaUt} className="text-[#2F4BFF] font-medium shrink-0">Koppla från</button>:<button onClick={()=>setDbConnect(true)} className="px-3 py-1 rounded-lg text-white font-medium shrink-0" style={{background:"#0E1726"}}>Anslut databas</button>}</div>}
       {roll==="forare" ? <ForarVy driver={forareJag} resor={resor} setResor={setResor}/> : <React.Fragment>
       {route.name==="oversikt"&&<Dashboard resor={resor} kvitton={kvitton} incidenter={incidenter} zoner={zoner} setRoute={setRoute} openOnboarding={()=>setOnboard(true)}/>}
       {route.name==="karta"&&<KartaHub key={hubKey} S={S}/>}
@@ -2187,7 +2183,7 @@ function App(){
       {route.name==="admin"&&<AdminModul bokRegler={bokRegler} setBokRegler={setBokRegler} openSettings={openSettings}/>}
       </React.Fragment>}
     </main>
-    <footer className="text-center text-[11px] font-mono text-[#8A93A0] py-6">Milvy · MVP med mockdata · {ORG.namn}</footer>
+    <footer className="text-center text-[11px] font-mono text-[#8A93A0] py-6">Milvy · {ORG.namn}</footer>
     </div>
     <AIAssistant resor={resor} setResor={setResor} open={aiOpen} setOpen={setAiOpen} openSettings={openSettings}/>
     {settings&&<AISettings onClose={closeSettings}/>}

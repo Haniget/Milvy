@@ -1289,7 +1289,7 @@ function Zoner({zoner,setZoner}){
   const [valda,setValda]=useState([]); const [ritar,setRitar]=useState(false); const [punkter,setPunkter]=useState([]); const [sok,setSok]=useState("");
   const [tFran,setTFran]=useState(""); const [tTill,setTTill]=useState(""); const [dagar,setDagar]=useState([1,2,3,4,5]);
   const [zontyp,setZontyp]=useState("Arbetsområde"); const [autoSyfte,setAutoSyfte]=useState(""); const [autoResetyp,setAutoResetyp]=useState(""); const [mottagare,setMottagare]=useState("");
-  const [adrText,setAdrText]=useState(""); const [adrRadie,setAdrRadie]=useState("0.3"); const [adrFel,setAdrFel]=useState("");
+  const [adrText,setAdrText]=useState(""); const [adrRadie,setAdrRadie]=useState("0.3"); const [adrFel,setAdrFel]=useState(""); const [adrPos,setAdrPos]=useState(null);
   const toggleDag=(d)=>setDagar(ds=>ds.includes(d)?ds.filter(x=>x!==d):[...ds,d]);
   useEffect(()=>{ map.current=L.map(mapRef.current).setView([59.61,16.55],10); L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ",{attribution:"© Mapbox © OpenStreetMap",maxZoom:19}).addTo(map.current);
     const inv=()=>{ if(map.current){ map.current.invalidateSize(); map.current.setView([59.61,16.55],10); } };
@@ -1319,12 +1319,14 @@ function Zoner({zoner,setZoner}){
   const taBort=async(id)=>{ if(await askConfirm("Ta bort zonen? Det går inte att ångra.",true)) setZoner(zs=>zs.filter(z=>z.id!==id)); };
   const skapaFranAdress=async()=>{ setAdrFel(""); const rad=parseFloat(String(adrRadie).replace(",","."))||0.3;
     if(!adrText.trim()){ setAdrFel("Skriv en adress."); return; }
-    try{ const r=await fetch("https://api.mapbox.com/geocoding/v5/mapbox.places/"+encodeURIComponent(adrText.trim())+".json?country=se&limit=1&language=sv&access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ"); const j=await r.json(); const f=j&&j.features&&j.features[0];
-      if(!f){ setAdrFel("Hittade inte adressen."); return; }
-      const n=namn.trim()||f.text||("Zon "+(zoner.length+1));
-      setZoner(zs=>[...zs,{id:"z"+Date.now(),namn:n,zontyp,lat:f.center[1],lng:f.center[0],radieKm:rad,points:null,regel,objektIds:valda,aktivFran:tFran||null,aktivTill:tTill||null,dagar:[...dagar],autoSyfte,autoResetyp,mottagare}]);
-      map.current.setView([f.center[1],f.center[0]],14);
-      setNamn(""); setValda([]); setAdrText(""); setAutoSyfte(""); setMottagare("");
+    try{ let pos=adrPos, etikett=adrText.trim();
+      if(!pos){ const r=await fetch("https://api.mapbox.com/geocoding/v5/mapbox.places/"+encodeURIComponent(adrText.trim())+".json?country=se&limit=1&language=sv&access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ"); const j=await r.json(); const f=j&&j.features&&j.features[0];
+        if(!f){ setAdrFel("Hittade inte adressen. Välj gärna ett förslag i listan."); return; }
+        pos={lat:f.center[1],lng:f.center[0]}; etikett=f.text||etikett; }
+      const n=namn.trim()||etikett.split(",")[0]||("Zon "+(zoner.length+1));
+      setZoner(zs=>[...zs,{id:"z"+Date.now(),namn:n,zontyp,lat:pos.lat,lng:pos.lng,radieKm:rad,points:null,regel,objektIds:valda,aktivFran:tFran||null,aktivTill:tTill||null,dagar:[...dagar],autoSyfte,autoResetyp,mottagare}]);
+      map.current.setView([pos.lat,pos.lng],14);
+      setNamn(""); setValda([]); setAdrText(""); setAdrPos(null); setAutoSyfte(""); setMottagare("");
     }catch(e){ setAdrFel("Kunde inte söka adressen."); } };
   const geokoda=async()=>{ if(!sok.trim())return; try{ const r=await fetch("https://api.mapbox.com/geocoding/v5/mapbox.places/"+encodeURIComponent(sok.trim())+".json?country=se&limit=1&language=sv&access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ"); const j=await r.json(); const f=j&&j.features&&j.features[0]; if(f) map.current.setView([f.center[1],f.center[0]],14); }catch(e){} };
   const minPlats=()=>{ navigator.geolocation&&navigator.geolocation.getCurrentPosition(pos=>map.current.setView([pos.coords.latitude,pos.coords.longitude],14)); };
@@ -1343,7 +1345,7 @@ function Zoner({zoner,setZoner}){
           <label className="text-xs text-gray-500 block">Zontyp<select value={zontyp} onChange={e=>setZontyp(e.target.value)} className={inp}><option>Arbetsområde</option><option>Kund</option><option>Depå / lager</option><option>Förbjudet område</option><option>Hemadress</option></select></label>
           <label className="text-xs text-gray-500 block">Regel<select value={regel} onChange={e=>setRegel(e.target.value)} className={inp}><option value="stanna_inne">Meddela om fordonet befinner sig utanför zon</option><option value="ej_in">Meddela om fordonet kör in i zon</option></select></label>
           <div className="rounded-lg p-2 bg-gray-50 border"><div className="text-xs font-medium text-gray-600 mb-1">Skapa från adress (istället för att rita)</div>
-            <input value={adrText} onChange={e=>setAdrText(e.target.value)} placeholder="Adress, t.ex. Verkstadsgatan 5, Västerås" className={inp}/>
+            <AdressSok value={adrText} onChange={v=>{ setAdrText(v); setAdrPos(null); }} onPick={item=>{ setAdrText(item.display_name); setAdrPos({lat:parseFloat(item.lat), lng:parseFloat(item.lon)}); }} placeholder="Adress, t.ex. Verkstadsgatan 5, Västerås" className={inp}/>
             <div className="grid grid-cols-2 gap-2 mt-1"><input value={adrRadie} onChange={e=>setAdrRadie(e.target.value)} placeholder="Radie km" className={inp}/>
             <button onClick={skapaFranAdress} className="px-3 py-2 rounded-lg text-white text-sm font-medium" style={{background:"#0E1726"}}>Skapa zon</button></div>
             {adrFel&&<div className="text-xs text-red-600 mt-1">{adrFel}</div>}

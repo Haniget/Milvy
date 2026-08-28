@@ -528,7 +528,7 @@ function OrgInstallningar(){
   useEffect(()=>{ (async()=>{ try{ const c=SB.cfg(); const rs=await SB._req("GET","org_settings?org_id=eq."+c.orgId); setS(rs&&rs[0]?rs[0]:{org_id:c.orgId,auto_klassning:false,intradesnotis:false,hastighetslarm:false,hastighetsgrans:110,tomgangslarm:false,tomgang_min:10,larm_mobil:"",_ny:true}); }catch(e){} })(); },[]);
   if(!s) return null;
   const set=(k,v)=>setS(x=>({...x,[k]:v}));
-  const spara=async()=>{ setSparad(""); try{ const c=SB.cfg(); const row={auto_klassning:!!s.auto_klassning,intradesnotis:!!s.intradesnotis,hastighetslarm:!!s.hastighetslarm,hastighetsgrans:parseInt(s.hastighetsgrans,10)||110,tomgangslarm:!!s.tomgangslarm,tomgang_min:parseInt(s.tomgang_min,10)||10,larm_mobil:s.larm_mobil||null,updated_at:new Date().toISOString()};
+  const spara=async()=>{ setSparad(""); try{ const c=SB.cfg(); const row={auto_klassning:!!s.auto_klassning,intradesnotis:!!s.intradesnotis,forarstatus:!!s.forarstatus,hastighetslarm:!!s.hastighetslarm,hastighetsgrans:parseInt(s.hastighetsgrans,10)||110,tomgangslarm:!!s.tomgangslarm,tomgang_min:parseInt(s.tomgang_min,10)||10,larm_mobil:s.larm_mobil||null,updated_at:new Date().toISOString()};
     if(s._ny){ await SB._req("POST","org_settings",Object.assign({},row,{org_id:c.orgId})); setS(x=>({...x,_ny:false})); }
     else { await SB._req("PATCH","org_settings?org_id=eq."+c.orgId,row); }
     setSparad("Sparat ✓"); setTimeout(()=>setSparad(""),2000);
@@ -538,6 +538,7 @@ function OrgInstallningar(){
     <div className="font-medium text-sm mb-1">Automatik & larm (hela organisationen)</div>
     <Rad k="auto_klassning" titel="Auto-klassning via zoner" beskr="Resor som slutar i en zon med klassningsregler får resesyfte och resetyp automatiskt."/>
     <Rad k="intradesnotis" titel="Notis vid ankomst till zon" beskr="SMS när ett fordon anländer till en zon som har mottagare."/>
+    <Rad k="forarstatus" titel="Förarstatus (upptagen/ledig)" beskr="Förare kan visa sin tillgänglighet med en knapp i appen."/>
     <Rad k="hastighetslarm" titel="Hastighetslarm" beskr="SMS om ett fordon överskrider gränsen."/>
     {s.hastighetslarm&&<input value={s.hastighetsgrans==null?"":s.hastighetsgrans} onChange={e=>set("hastighetsgrans",e.target.value)} placeholder="Gräns km/h" className="border rounded px-2 py-1 text-sm w-28 ml-6 mb-1"/>}
     <Rad k="tomgangslarm" titel="Tomgångslarm" beskr="SMS om ett fordon står på tomgång längre än gränsen."/>
@@ -746,16 +747,19 @@ function Fordon({setRoute}){
       {db&&<button onClick={()=>setEdit({_ny:true,regNr:"",fabrikat:"",modell:"",fordonsar:"",matarstallningKm:"",ansvarigId:"",deviceId:""})} className="px-3 py-2 rounded-lg text-white text-sm font-medium" style={{background:"#0E1726"}}>+ Nytt fordon</button>}</div>
     <Card className="p-3"><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Sök reg nr, fabrikat eller modell…" className="w-full md:w-80 px-3 py-2 border rounded-lg text-sm"/></Card>
     <Card className="overflow-hidden"><table className="w-full text-sm"><thead><tr className="text-left text-gray-500 bg-gray-50 border-b"><th className="px-4 py-2.5">Reg nr</th><th>Fabrikat</th><th>Modell</th><th>Drivmedel</th><th>År</th><th>Mätarst.</th><th>Ansvarig</th><th>Status</th>{db&&<th></th>}</tr></thead>
-      <tbody>{list.map(v=>(<tr key={v.id} onClick={()=>setRoute({name:"fordon",id:v.id})} className="border-b last:border-0 hover:bg-blue-50 cursor-pointer"><td className="px-4 py-2.5 font-semibold text-blue-700">{v.regNr}</td><td>{v.fabrikat}</td><td>{v.modell}</td><td className="text-gray-500">{v.drivmedel}</td><td>{v.fordonsar}</td><td>{kr(v.matarstallningKm)} km</td><td>{v.fordonsansvarig}</td><td><Badge color={v.status==="aktiv"?"gron":"gra"}>{v.status}</Badge></td>{db&&<td><button onClick={(e)=>{e.stopPropagation(); setEdit({id:v.id,regNr:v.regNr,fabrikat:v.fabrikat,modell:v.modell,fordonsar:v.fordonsar,matarstallningKm:v.matarstallningKm,ansvarigId:v.ansvarigId||"",deviceId:v.deviceId||"",_prevDevice:v.deviceId||""});}} className="px-3 py-1 rounded text-xs font-medium border hover:bg-gray-100">Redigera</button></td>}</tr>))}</tbody></table></Card>
+      <tbody>{list.map(v=>(<tr key={v.id} onClick={()=>setRoute({name:"fordon",id:v.id})} className="border-b last:border-0 hover:bg-blue-50 cursor-pointer"><td className="px-4 py-2.5 font-semibold text-blue-700">{((KATEGORIER.find(k=>k.id===v.kategoriId)||{}).ikon||"")+" "}{v.regNr}</td><td>{v.fabrikat}</td><td>{v.modell}</td><td className="text-gray-500">{v.drivmedel}</td><td>{v.fordonsar}</td><td>{kr(v.matarstallningKm)} km</td><td>{v.fordonsansvarig}</td><td><Badge color={v.status==="aktiv"?"gron":"gra"}>{v.status}</Badge></td>{db&&<td><button onClick={(e)=>{e.stopPropagation(); setEdit({id:v.id,regNr:v.regNr,fabrikat:v.fabrikat,modell:v.modell,fordonsar:v.fordonsar,matarstallningKm:v.matarstallningKm,ansvarigId:v.ansvarigId||"",deviceId:v.deviceId||"",_prevDevice:v.deviceId||"",kategoriId:v.kategoriId||"",forbrukning:v.forbrukning||"",co2:v.co2||""});}} className="px-3 py-1 rounded text-xs font-medium border hover:bg-gray-100">Redigera</button></td>}</tr>))}</tbody></table></Card>
     {edit&&<FordonModal fordon={edit} onClose={()=>setEdit(null)} onSaved={()=>{setEdit(null); setVer(x=>x+1);}}/>}
   </div>);
 }
 function FordonModal({fordon,onClose,onSaved}){
   const [d,setD]=useState(fordon); const [busy,setBusy]=useState(false); const [msg,setMsg]=useState("");
   const set=(k)=>(e)=>setD(x=>({...x,[k]:e.target.value}));
+  const [omKat,setOmKat]=useState(0);
+  const nyKategori=async()=>{ const n=prompt("Kategorinamn (t.ex. Servicebilar):"); if(!n)return; const ik=prompt("Ikon (emoji):","🚗")||"🚗";
+    try{ const c=SB.cfg(); const ins=await SB._req("POST","categories",{org_id:c.orgId,namn:n.trim(),ikon:ik}); if(ins&&ins[0]){ KATEGORIER.push(ins[0]); setD(x=>({...x,kategoriId:ins[0].id})); setOmKat(v=>v+1); } }catch(e){ alert("Kunde inte skapa kategori: "+(e.message||e)); } };
   const spara=async()=>{ if(!d.regNr||!String(d.regNr).trim()){ setMsg("Reg.nr krävs."); return; } setBusy(true); setMsg("");
     try{
-      const row={reg_nr:String(d.regNr).toUpperCase().replace(/\s+/g,""),fabrikat:d.fabrikat||null,modell:d.modell||null,fordonsar:d.fordonsar?parseInt(d.fordonsar,10):null,matarstallning_km:d.matarstallningKm?parseInt(String(d.matarstallningKm).replace(/\D/g,""),10):null,ansvarig_driver_id:d.ansvarigId||null};
+      const row={reg_nr:String(d.regNr).toUpperCase().replace(/\s+/g,""),fabrikat:d.fabrikat||null,modell:d.modell||null,fordonsar:d.fordonsar?parseInt(d.fordonsar,10):null,matarstallning_km:d.matarstallningKm?parseInt(String(d.matarstallningKm).replace(/\D/g,""),10):null,ansvarig_driver_id:d.ansvarigId||null,category_id:d.kategoriId||null,forbrukning_l:(d.forbrukning!==""&&d.forbrukning!=null)?parseFloat(String(d.forbrukning).replace(",",".")):null,co2_blandad:(d.co2!==""&&d.co2!=null)?parseFloat(String(d.co2).replace(",",".")):null};
       let vid=d.id;
       if(d._ny){ const c=SB.cfg(); const ins=await SB._req("POST","vehicles",Object.assign({},row,{org_id:c.orgId,status:"aktiv"})); vid=ins&&ins[0]&&ins[0].id; }
       else { await SB.update("vehicles",vid,row); }
@@ -775,6 +779,10 @@ function FordonModal({fordon,onClose,onSaved}){
       <input value={d.matarstallningKm||""} onChange={set("matarstallningKm")} placeholder="Mätarställning (km)" className="border rounded px-2 py-1.5 text-sm"/>
       <select value={d.ansvarigId||""} onChange={set("ansvarigId")} className="border rounded px-2 py-1.5 text-sm bg-white"><option value="">Ansvarig förare…</option>{FORARE.map(f=>(<option key={f.id} value={f.id}>{f.namn}</option>))}</select>
       <select value={d.deviceId||""} onChange={set("deviceId")} className="border rounded px-2 py-1.5 text-sm bg-white col-span-2"><option value="">Ingen puck kopplad</option>{lediga.map(en=>(<option key={en.id} value={en.id}>{(en.hardvara||"Puck")+" · IMEI "+en.imei+(en.regNr&&en.id!==d._prevDevice?" (på "+en.regNr+")":"")}</option>))}</select>
+      <select value={d.kategoriId||""} onChange={set("kategoriId")} className="border rounded px-2 py-1.5 text-sm bg-white"><option value="">Kategori…</option>{KATEGORIER.map(k=>(<option key={k.id} value={k.id}>{(k.ikon||"")+" "+k.namn}</option>))}</select>
+      <button onClick={nyKategori} className="border rounded px-2 py-1.5 text-sm text-gray-500 hover:bg-gray-50 text-left">+ Ny kategori</button>
+      <input value={d.forbrukning||""} onChange={set("forbrukning")} placeholder="Förbrukning l/100 km" className="border rounded px-2 py-1.5 text-sm"/>
+      <input value={d.co2||""} onChange={set("co2")} placeholder="CO2 g/km (blandad)" className="border rounded px-2 py-1.5 text-sm"/>
     </div>
     {msg&&<div className="text-xs text-red-600 mt-2">{msg}</div>}
     <div className="flex gap-2 mt-4"><button disabled={busy} onClick={spara} className="px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-60" style={{background:"#0E1726"}}>{busy?"Sparar…":"Spara"}</button><button onClick={onClose} className="px-4 py-2 rounded-lg border text-sm">Avbryt</button></div>
@@ -922,7 +930,7 @@ function Karta({priv}){
   useEffect(()=>{ if(live) hamtaLive(); },[live]);
   useEffect(()=>{ if(!map.current)return; Object.values(markers.current).forEach(m=>map.current.removeLayer(m)); markers.current={};
     if(live){ liveData.filter(d=>d.active).forEach(d=>{ const m=L.marker([d.lat,d.lng]).addTo(map.current); m.bindPopup("<b>"+d.name+"</b><br>"+(d.ts?fmtKlock(d.ts):"")+"<br>"+d.speed+" km/h"+(d.ignition?" · tändning på":"")); markers.current["d"+d.id]=m; }); }
-    else { mockFordon.forEach(v=>{ const p=SENASTE_POS[v.id]; if(!p)return; const m=L.marker([p.lat,p.lng]).addTo(map.current); m.bindPopup("<b>"+v.regNr+"</b><br>"+v.fordonsansvarig+"<br>"+fmtKlock(p.tid)+"<br>"+p.hast+" km/h"); markers.current[v.id]=m; }); }
+    else { mockFordon.forEach(v=>{ const p=SENASTE_POS[v.id]; if(!p)return; const m=L.marker([p.lat,p.lng]).addTo(map.current); m.bindPopup("<b>"+v.regNr+"</b><br>"+v.fordonsansvarig+"<br>"+fmtKlock(p.tid)+"<br>"+p.hast+" km/h"+(v.batteriPct!=null?("<br>🔋 "+v.batteriPct+" %"+(v.rackviddKm!=null?(" · "+v.rackviddKm+" km kvar"):"")):"")); markers.current[v.id]=m; }); }
   },[live,liveData,endastRorelse,tick]);
   const centerMock=(v)=>{ const p=SENASTE_POS[v.id]; if(!p)return; setSel(v.id); map.current.setView([p.lat,p.lng],13); markers.current[v.id]&&markers.current[v.id].openPopup(); };
   const centerLive=(d)=>{ if(!d.active)return; setSel("d"+d.id); map.current.setView([d.lat,d.lng],13); markers.current["d"+d.id]&&markers.current["d"+d.id].openPopup(); };
@@ -1801,7 +1809,8 @@ const SB={
     try{ const os=await this._req("GET","organisations?select=*&limit=1"); if(os&&os[0]) Object.assign(ORG,{namn:os[0].namn||ORG.namn,orgnr:os[0].orgnr||ORG.orgnr,adress:os[0].adress||ORG.adress,postnr:os[0].postnr||ORG.postnr,postort:os[0].postort||ORG.postort}); }catch(e){}
     const posMap={}; try{ const ps=await this._req("GET","positions?select=vehicle_id,ts,lat,lng,speed,ignition&order=ts.desc&limit=300"); (ps||[]).forEach(p=>{ if(!posMap[p.vehicle_id]) posMap[p.vehicle_id]=p; }); }catch(e){}
     FORDON.length=0; (vs||[]).forEach(v=>{ const dev=(es||[]).find(e=>e.vehicle_id===v.id)||{}; const drv=(ds||[]).find(d=>d.id===v.ansvarig_driver_id)||{}; const pos=posMap[v.id]||{};
-      FORDON.push({ id:v.id, regNr:v.reg_nr||"", fabrikat:v.fabrikat||"", modell:v.modell||"", fordonsklass:v.fordonsklass||"", drivmedel:v.drivmedel||"", fordonsar:v.fordonsar||"", farg:v.farg||"", vin:v.vin||"", matarstallningKm:v.matarstallning_km||0, kmIAr:v.km_i_ar||0, organisation:ORG.namn, fordonsansvarig:drv.namn||"–", enhetId:dev.enhet_id||"", status:v.status||"aktiv", nastaBesiktning:v.nasta_besiktning||"", lat:pos.lat, lng:pos.lng, ignition:pos.ignition===true, senastSedd:pos.ts||dev.last_seen||"", ansvarigId:v.ansvarig_driver_id||"", deviceId:dev.id||"" }); });
+      FORDON.push({ id:v.id, regNr:v.reg_nr||"", fabrikat:v.fabrikat||"", modell:v.modell||"", fordonsklass:v.fordonsklass||"", drivmedel:v.drivmedel||"", fordonsar:v.fordonsar||"", farg:v.farg||"", vin:v.vin||"", matarstallningKm:v.matarstallning_km||0, kmIAr:v.km_i_ar||0, organisation:ORG.namn, fordonsansvarig:drv.namn||"–", enhetId:dev.enhet_id||"", status:v.status||"aktiv", nastaBesiktning:v.nasta_besiktning||"", lat:pos.lat, lng:pos.lng, ignition:pos.ignition===true, senastSedd:pos.ts||dev.last_seen||"", ansvarigId:v.ansvarig_driver_id||"", deviceId:dev.id||"", kategoriId:v.category_id||"", forbrukning:(v.forbrukning_l!=null?v.forbrukning_l:""), co2:(v.co2_blandad!=null?v.co2_blandad:""), batteriPct:(dev.batteri_pct!=null?dev.batteri_pct:null), rackviddKm:(dev.rackvidd_km!=null?dev.rackvidd_km:null) }); });
+    try{ const ks=await this._req("GET","categories?select=*&order=namn"); KATEGORIER.length=0; (ks||[]).forEach(k=>{ KATEGORIER.push(k); }); }catch(e){}
     Object.keys(SENASTE_POS).forEach(k=>{ delete SENASTE_POS[k]; });
     (vs||[]).forEach(v=>{ const pos=posMap[v.id]; if(pos&&pos.lat!=null&&pos.lng!=null){ SENASTE_POS[v.id]={ lat:pos.lat, lng:pos.lng, tid:new Date(pos.ts), adress:"", hast:Math.round(pos.speed||0) }; } });
     FORARE.length=0; (ds||[]).forEach(d=>{ const v=(vs||[]).find(x=>x.ansvarig_driver_id===d.id); FORARE.push({ id:d.id, namn:d.namn||"", titel:d.titel||"Förare", epost:d.epost||"", mobil:d.mobil||"", rfidNr:d.rfid_nr||"", kopplatFordonId:v?v.id:"", organisation:ORG.namn, status:d.aktiv===false?"inaktiv":"aktiv" }); });
@@ -2127,6 +2136,48 @@ function DbConnectModal({onClose,onConnected}){
   </Card></div>);
 }
 
+function ForarStatus(){
+  const [pa,setPa]=useState(false); const [st,setSt]=useState("ledig"); const [busy,setBusy]=useState(false);
+  const c=SB.cfg();
+  useEffect(()=>{ if(SB.loggedIn()&&c.driverId){ (async()=>{ try{ const os=await SB._req("GET","org_settings?select=forarstatus&org_id=eq."+c.orgId); if(os&&os[0]&&os[0].forarstatus){ setPa(true); const dr=await SB._req("GET","drivers?select=tillganglighet&id=eq."+c.driverId); if(dr&&dr[0]&&dr[0].tillganglighet) setSt(dr[0].tillganglighet); } }catch(e){} })(); } },[]);
+  if(!pa||!c.driverId) return null;
+  const toggla=async()=>{ setBusy(true); const ny=st==="ledig"?"upptagen":"ledig"; try{ await SB.update("drivers",c.driverId,{tillganglighet:ny}); setSt(ny); }catch(e){ alert(e.message||e); } setBusy(false); };
+  return (<button onClick={toggla} disabled={busy} title="Visa din tillgänglighet för teamet" className={"fixed bottom-20 left-5 md:left-60 z-[1300] rounded-full shadow-xl px-4 py-3 text-sm font-semibold "+(st==="upptagen"?"text-white":"bg-white border")} style={st==="upptagen"?{background:"#EA580C"}:{}}>
+    {st==="upptagen"?"🔴 Upptagen":"🟢 Ledig"}
+  </button>);
+}
+function Marketplace(){
+  const [open,setOpen]=useState(false); const [antal,setAntal]=useState("1"); const [kommentar,setKommentar]=useState(""); const [skickad,setSkickad]=useState(""); const [busy,setBusy]=useState(false);
+  if(!SB.loggedIn()) return null;
+  const bestall=async(vad)=>{ setBusy(true); setSkickad(""); const c=SB.cfg();
+    try{ const t=await SB._req("POST","tickets",{org_id:c.orgId,typ:"support",titel:"Beställning: "+vad,skapad_av:c.uid});
+      await SB._req("POST","ticket_messages",{ticket_id:t[0].id,org_id:c.orgId,roll:"kund",avsandare:c.email||"Kund",text:"Beställning via Marketplace: "+vad+(kommentar?("\n"+"Kommentar: "+kommentar):"")});
+      setSkickad("✓ Beställningen är skickad! Vi återkommer med orderbekräftelse i supportchatten."); setKommentar("");
+    }catch(e){ setSkickad("✗ "+(e.message||e)); } setBusy(false); };
+  return (<div>
+    <button onClick={()=>setOpen(!open)} className="fixed bottom-5 right-40 z-[1300] rounded-full shadow-xl px-4 py-3 text-sm font-semibold bg-white border">{open?"✕ Stäng":"🛒 Marketplace"}</button>
+    {open&&<div className="fixed bottom-20 right-5 z-[1310] w-[340px] max-w-[92vw] bg-white rounded-2xl shadow-2xl border p-4 space-y-3 max-h-[500px] overflow-y-auto">
+      <div className="font-bold text-sm">Marketplace</div>
+      <div className="border rounded-xl p-3">
+        <div className="font-medium text-sm">📡 Fler trackers (Teltonika FMC003)</div>
+        <div className="text-xs text-gray-500 mb-2">Beställ fler puckar till flottan — vi förkonfigurerar och skickar.</div>
+        <div className="flex gap-2 items-center"><input value={antal} onChange={e=>setAntal(e.target.value)} className="border rounded px-2 py-1.5 text-sm w-16"/><span className="text-xs text-gray-500">st</span><button disabled={busy} onClick={()=>bestall(antal+" st trackers")} className="px-3 py-1.5 rounded text-white text-sm" style={{background:"#0E1726"}}>Beställ</button></div>
+      </div>
+      <div className="border rounded-xl p-3">
+        <div className="font-medium text-sm">🔧 Montering på plats</div>
+        <div className="text-xs text-gray-500 mb-2">Vi installerar puckarna i era fordon.</div>
+        <button disabled={busy} onClick={()=>bestall("Montering på plats")} className="px-3 py-1.5 rounded border text-sm hover:bg-gray-50">Begär offert</button>
+      </div>
+      <div className="border rounded-xl p-3">
+        <div className="font-medium text-sm">⭐ Uppgradera plan</div>
+        <div className="text-xs text-gray-500 mb-2">Fler fordon, fler zoner och prioriterad support.</div>
+        <button disabled={busy} onClick={()=>bestall("Planuppgradering")} className="px-3 py-1.5 rounded border text-sm hover:bg-gray-50">Kontakta oss</button>
+      </div>
+      <textarea value={kommentar} onChange={e=>setKommentar(e.target.value)} placeholder="Kommentar (valfritt)…" rows={2} className="w-full border rounded px-2 py-1.5 text-sm"/>
+      {skickad&&<div className="text-xs">{skickad}</div>}
+    </div>}
+  </div>);
+}
 function PrivatLage(){
   const [till,setTill]=useState(null); const [busy,setBusy]=useState(false);
   const c=SB.cfg();
@@ -2194,6 +2245,7 @@ function SupportChat(){
     </div>}
   </div>);
 }
+const KATEGORIER=[];
 const SB_DEFAULTS={url:"https://jmyfwgxfyeblfavduqig.supabase.co",anon:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpteWZ3Z3hmeWVibGZhdmR1cWlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NjkzMzIsImV4cCI6MjA5ODM0NTMzMn0.yDNsuZVezbETAAjq1z2iaxXPRb7CyENDdcrfpcKqsH8"};
 function LoginGate({onDone}){
   const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [busy,setBusy]=useState(false); const [msg,setMsg]=useState("");
@@ -2308,6 +2360,8 @@ function App(){
     <Header route={route} setRoute={setRoute} openSettings={openSettings} navOpen={navOpen} setNavOpen={setNavOpen} roll={roll} setRoll={(r)=>{setRoll(r); setRoute(r==="forare"?{name:"forare_resor"}:{name:"oversikt"}); setNavOpen(false);}}/>
     <SupportChat/>
     <PrivatLage/>
+    <ForarStatus/>
+    <Marketplace/>
     {navOpen&&<div className="fixed inset-0 bg-black/40 z-[1150] md:hidden" onClick={()=>setNavOpen(false)}></div>}
     <div className="flex-1 min-w-0 flex flex-col">
     <div className="md:hidden sticky top-0 z-[1100] flex items-center gap-3 h-12 px-4 text-white" style={{background:"#0E1726"}}>

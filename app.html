@@ -1745,7 +1745,8 @@ const SB={
     try{ ["kvitton","laddning","incidenter","zoner","resor_ov","bokningar","larm"].forEach(k=>localStorage.removeItem("msp_"+k)); }catch(e){}
     try{RESOR.length=0;}catch(e){} try{KVITTON_INIT.length=0;}catch(e){} try{LADDNING_INIT.length=0;}catch(e){} try{INCIDENTER_INIT.length=0;}catch(e){}
     try{ZONER_INIT.length=0;}catch(e){} try{MASKINER.length=0;}catch(e){} try{ANVANDARLOGG.length=0;}catch(e){} try{MOTTAGARE_INIT.length=0;}catch(e){}
-    try{TEMPSENSORER.length=0;}catch(e){} try{STATIONER.length=0;}catch(e){} try{ROERELSELARM.length=0;}catch(e){} try{ALLAOBJEKT.length=0;}catch(e){}
+    try{TEMPSENSORER.length=0;}catch(e){} try{STATIONER.length=0;}catch(e){} try{ROERELSELARM.length=0;}catch(e){}
+    try{ ALLAOBJEKT.length=0; FORDON.forEach(v=>{ ALLAOBJEKT.push({id:v.id,namn:v.regNr,typ:"Fordon"}); }); }catch(e){}
     const forsta=!SB._hydrated; SB._hydrated=true; return forsta; },
   removeBy(table,filter){ return this._req("DELETE",table+"?"+filter); },
   listTrips(){ const c=this.cfg(); return this._req("GET","trips?select=*,vehicles(reg_nr)&driver_id=eq."+c.driverId+"&order=start_tid.desc&limit=300"); },

@@ -2114,18 +2114,37 @@ function SupportChat(){
 const SB_DEFAULTS={url:"https://jmyfwgxfyeblfavduqig.supabase.co",anon:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpteWZ3Z3hmeWVibGZhdmR1cWlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NjkzMzIsImV4cCI6MjA5ODM0NTMzMn0.yDNsuZVezbETAAjq1z2iaxXPRb7CyENDdcrfpcKqsH8"};
 function LoginGate({onDone}){
   const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [busy,setBusy]=useState(false); const [msg,setMsg]=useState("");
+  const [lage,setLage]=useState("login"); const [kod,setKod]=useState(""); const [nytt,setNytt]=useState(""); const [info,setInfo]=useState("");
   useEffect(()=>{ const m=location.hash.match(/impersonate=([^&]+)/); if(m){ setBusy(true); SB.signInWithHash(decodeURIComponent(m[1])).then(()=>{ try{history.replaceState(null,"",location.pathname);}catch(e){} onDone(); }).catch(e=>{ setMsg(String(e.message||e)); setBusy(false); }); } },[]);
-  const logga=async()=>{ setBusy(true); setMsg(""); const c=SB.cfg(); SB.setCfg({...c,url:c.url||SB_DEFAULTS.url,anon:c.anon||SB_DEFAULTS.anon}); try{ await SB.signIn(email.trim(),pw); setPw(""); onDone(); }catch(e){ setMsg(String(e.message||e).slice(0,220)); } setBusy(false); };
+  const logga=async()=>{ setBusy(true); setMsg(""); setInfo(""); const c=SB.cfg(); SB.setCfg({...c,url:c.url||SB_DEFAULTS.url,anon:c.anon||SB_DEFAULTS.anon}); try{ await SB.signIn(email.trim(),pw); setPw(""); onDone(); }catch(e){ setMsg(String(e.message||e).slice(0,220)); } setBusy(false); };
+  const begarKod=async()=>{ if(!email.trim()){ setMsg("Fyll i din e-postadress först."); return; } setBusy(true); setMsg(""); setInfo("");
+    try{ const r=await fetch(SB_DEFAULTS.url+"/functions/v1/auth-reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"request",email:email.trim()})}); const j=await r.json(); if(!r.ok) throw new Error(j.error||"Något gick fel."); setInfo(j.info||""); setLage("kod"); }catch(e){ setMsg(String(e.message||e)); } setBusy(false); };
+  const bytLosen=async()=>{ setBusy(true); setMsg("");
+    try{ const r=await fetch(SB_DEFAULTS.url+"/functions/v1/auth-reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"confirm",email:email.trim(),kod:kod.trim(),losenord:nytt})}); const j=await r.json(); if(!r.ok) throw new Error(j.error||"Något gick fel."); setKod(""); setNytt(""); setLage("login"); setInfo("Lösenordet är bytt – logga in med det nya."); }catch(e){ setMsg(String(e.message||e)); } setBusy(false); };
   return (<div className="min-h-screen flex items-center justify-center p-4" style={{background:"#0E1726"}}>
     <div className="w-[380px] max-w-full bg-white rounded-2xl p-6 shadow-xl">
       <div className="font-display font-black text-2xl mb-1">Milvy</div>
-      <p className="text-sm text-gray-500 mb-4">Logga in för att komma åt flottkontrollpanelen.</p>
-      <div className="space-y-2">
-        <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="E-post" autoComplete="username" className="w-full border rounded px-3 py-2 text-sm"/>
-        <input value={pw} onChange={e=>setPw(e.target.value)} type="password" placeholder="Lösenord" autoComplete="current-password" onKeyDown={e=>{if(e.key==="Enter")logga();}} className="w-full border rounded px-3 py-2 text-sm"/>
-        {msg&&<div className="text-xs text-red-600 break-words">{msg}</div>}
-        <button onClick={logga} disabled={busy} className="w-full py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60" style={{background:"#2F4BFF"}}>{busy?"Loggar in…":"Logga in"}</button>
-      </div>
+      {lage==="login"&&<React.Fragment>
+        <p className="text-sm text-gray-500 mb-4">Logga in för att komma åt flottkontrollpanelen.</p>
+        <div className="space-y-2">
+          <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="E-post" autoComplete="username" className="w-full border rounded px-3 py-2 text-sm"/>
+          <input value={pw} onChange={e=>setPw(e.target.value)} type="password" placeholder="Lösenord" autoComplete="current-password" onKeyDown={e=>{if(e.key==="Enter")logga();}} className="w-full border rounded px-3 py-2 text-sm"/>
+          {info&&<div className="text-xs text-green-700 break-words">{info}</div>}
+          {msg&&<div className="text-xs text-red-600 break-words">{msg}</div>}
+          <button onClick={logga} disabled={busy} className="w-full py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60" style={{background:"#2F4BFF"}}>{busy?"Loggar in…":"Logga in"}</button>
+          <button onClick={begarKod} disabled={busy} className="w-full text-xs text-gray-500 hover:text-gray-800 pt-1">Glömt lösenord? Få en kod via SMS</button>
+        </div>
+      </React.Fragment>}
+      {lage==="kod"&&<React.Fragment>
+        <p className="text-sm text-gray-500 mb-4">{info||"Ange koden du fått via SMS och välj ett nytt lösenord."}</p>
+        <div className="space-y-2">
+          <input value={kod} onChange={e=>setKod(e.target.value)} placeholder="6-siffrig kod" inputMode="numeric" className="w-full border rounded px-3 py-2 text-sm"/>
+          <input value={nytt} onChange={e=>setNytt(e.target.value)} type="password" placeholder="Nytt lösenord (minst 8 tecken)" autoComplete="new-password" onKeyDown={e=>{if(e.key==="Enter")bytLosen();}} className="w-full border rounded px-3 py-2 text-sm"/>
+          {msg&&<div className="text-xs text-red-600 break-words">{msg}</div>}
+          <button onClick={bytLosen} disabled={busy} className="w-full py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60" style={{background:"#2F4BFF"}}>{busy?"Byter…":"Byt lösenord"}</button>
+          <button onClick={()=>{setLage("login");setMsg("");}} className="w-full text-xs text-gray-500 hover:text-gray-800 pt-1">← Tillbaka till inloggning</button>
+        </div>
+      </React.Fragment>}
     </div>
   </div>);
 }

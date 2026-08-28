@@ -1588,7 +1588,10 @@ function AdminModul({bokRegler,setBokRegler,openSettings}){
 /* ============================ HUBBAR / SAMLAD LARMVY / SÖK ============================ */
 function AllaLarm({resor,zoner}){
   const [filt,setFilt]=useState("alla");
+  const [dbLarm,setDbLarm]=useState([]);
+  useEffect(()=>{ if(SB.loggedIn()){ SB._req("GET","alarms?select=*,vehicles(reg_nr)&order=tid.desc&limit=200").then(setDbLarm).catch(()=>{}); } },[]);
   const ev=[];
+  dbLarm.forEach(a=>ev.push({kat:(a.typ==="zon"?"Zon":"Enhet"), typ:(a.typ==="zon"?"Zonlarm":a.typ), allvar:(a.severity==="hog"?"hog":a.severity==="medel"?"medel":"info"), text:a.beskrivning||"", reg:(a.vehicles&&a.vehicles.reg_nr)||"", tid:new Date(a.tid)}));
   detekteraAvvikelser(resor).forEach(a=>ev.push({kat:"Avvikelse",typ:a.typ,allvar:a.allvar,text:a.text,reg:a.r.fordonRegNr,tid:a.r.startTid}));
   ENHETSHANDELSER.forEach(e=>ev.push({kat:"Enhet",typ:e.typ,allvar:e.allvar,text:e.typ+" ("+e.enhetId+")",reg:e.reg,tid:new Date(e.tid.replace(" ","T"))}));
   (zoner||[]).forEach(z=>zonBrott(z).forEach(oid=>{const o=ALLAOBJEKT.find(x=>x.id===oid); ev.push({kat:"Zon",typ:"Zonöverträdelse",allvar:"hog",text:(o&&o.namn)+" "+(z.regel==="ej_in"?"inne i":"utanför")+" "+z.namn,reg:o&&o.namn,tid:idag});}));
@@ -2164,14 +2167,45 @@ function App(){
         if(r.attesterad!==p.attesterad) patch.attesterad=r.attesterad;
         if(Object.keys(patch).length) SB.updateTrip(r.id,patch).catch(()=>{}); }); }
     return next; }); };
-  const laddaOrgResor=async()=>{ try{ const tr=await SB.listOrgTrips(); if(Array.isArray(tr)){ setResorRaw(tr.map(mapDbTrip)); setDbAdmin(true); dbAdminRef.current=true; } }catch(e){} try{ if(await SB.hydrate()){ setKvitton(DB.load("kvitton",[])); setLaddning(DB.load("laddning",[])); setIncidenter(DB.load("incidenter",[])); setZoner(DB.load("zoner",[])); setCfgVer(v=>v+1); } }catch(e){} };
+  const laddaOrgResor=async()=>{ try{ const tr=await SB.listOrgTrips(); if(Array.isArray(tr)){ setResorRaw(tr.map(mapDbTrip)); setDbAdmin(true); dbAdminRef.current=true; } }catch(e){} try{ if(await SB.hydrate()){ laddaKvitton(); laddaLaddning(); setIncidenter(DB.load("incidenter",[])); laddaZoner(); setCfgVer(v=>v+1); } }catch(e){} };
   const dbKoppla=()=>{ setDbConnect(false); laddaOrgResor(); };
   const dbKopplaUt=()=>{ SB.signOut(); setDbAdmin(false); dbAdminRef.current=false; setResorRaw(applyResorOv(RESOR)); setAuthed(false); };
-  useEffect(()=>{ if(!SB.loggedIn())return; if(SB.isAdmin()) laddaOrgResor(); else SB.hydrate().then(ok=>{ if(ok){ setResorRaw(applyResorOv(RESOR)); setKvitton(DB.load("kvitton",[])); setLaddning(DB.load("laddning",[])); setIncidenter(DB.load("incidenter",[])); setZoner(DB.load("zoner",[])); setCfgVer(v=>v+1); } }).catch(()=>{}); },[]);
-  const [kvitton,setKvitton]=useState(()=>DB.load("kvitton",KVITTON_INIT));
-  const [laddning,setLaddning]=useState(()=>DB.load("laddning",LADDNING_INIT));
+  useEffect(()=>{ if(!SB.loggedIn())return; if(SB.isAdmin()) laddaOrgResor(); else SB.hydrate().then(ok=>{ if(ok){ setResorRaw(applyResorOv(RESOR)); laddaKvitton(); laddaLaddning(); setIncidenter(DB.load("incidenter",[])); laddaZoner(); setCfgVer(v=>v+1); } }).catch(()=>{}); },[]);
+  const [kvitton,setKvittonRaw]=useState(()=>DB.load("kvitton",KVITTON_INIT));
+  const kvTillDb=async(k)=>{ let bild=k.bildUrl||null; if(k.bild&&String(k.bild).slice(0,5)==="data:"){ try{ bild=await SB.uploadPhoto(k.bild); }catch(e){} }
+    const v=FORDON.find(f=>f.regNr===k.fordonRegNr); return { typ:k.typ||"Övrigt", belopp:Number(k.belopp)||0, datum:k.datum||null, leverantor:k.leverantor||null, vehicle_id:(v&&String(v.id).length>30)?v.id:null, status:k.status||"omatchad", kalla:"app", bild_url:bild }; };
+  const dbTillKv=(r)=>{ const v=FORDON.find(f=>f.id===r.vehicle_id); return { id:r.id, typ:r.typ, belopp:Number(r.belopp)||0, datum:r.datum, fordonRegNr:v?v.regNr:null, leverantor:r.leverantor, status:r.status||"omatchad", bildUrl:r.bild_url||null }; };
+  const laddaKvitton=async()=>{ try{ const rs=await SB._req("GET","receipts?select=*&order=datum.desc"); setKvittonRaw(rs.map(dbTillKv)); }catch(e){} };
+  const setKvitton=(upd)=>{ setKvittonRaw(prev=>{ const next=typeof upd==="function"?upd(prev):upd;
+    if(SB.loggedIn()){ (async()=>{ try{ const c=SB.cfg(); const p={}; prev.forEach(k=>{p[k.id]=k;}); const n={}; next.forEach(k=>{n[k.id]=k;});
+      for(const k of next){ if(!p[k.id]){ const row=await kvTillDb(k); const ins=await SB._req("POST","receipts",Object.assign({},row,{org_id:c.orgId})); if(ins&&ins[0]&&ins[0].id){ const g=k.id; setKvittonRaw(l=>l.map(x=>x.id===g?Object.assign({},x,{id:ins[0].id,bildUrl:ins[0].bild_url||x.bildUrl}):x)); } }
+        else if(String(k.id).length>30&&JSON.stringify(p[k.id])!==JSON.stringify(k)){ const row=await kvTillDb(k); await SB.update("receipts",k.id,row); } }
+      for(const k of prev){ if(!n[k.id]&&String(k.id).length>30){ await SB.remove("receipts",k.id); } }
+    }catch(e){ console.warn("kvittosync",e); } })(); }
+    return next; }); };
+  const [laddning,setLaddningRaw]=useState(()=>DB.load("laddning",LADDNING_INIT));
+  const laTillDb=(l)=>{ const v=FORDON.find(f=>f.regNr===l.fordonRegNr); const d=FORARE.find(f=>f.namn===l.forare); return { vehicle_id:(v&&String(v.id).length>30)?v.id:null, driver_id:(d&&String(d.id).length>30)?d.id:null, datum:l.datum||null, kwh:Number(l.kwh)||0, elpris_kr:Number(l.elprisKr)||0, ersattning:Number(l.ersattning)||0, status:l.status||"Ej utbetald" }; };
+  const dbTillLa=(r)=>{ const v=FORDON.find(f=>f.id===r.vehicle_id); const d=FORARE.find(f=>f.id===r.driver_id); return { id:r.id, fordonRegNr:v?v.regNr:"", forare:d?d.namn:"", kwh:Number(r.kwh)||0, elprisKr:Number(r.elpris_kr)||0, datum:r.datum, ersattning:Number(r.ersattning)||0, status:r.status||"Ej utbetald" }; };
+  const laddaLaddning=async()=>{ try{ const rs=await SB._req("GET","charging_sessions?select=*&order=datum.desc"); setLaddningRaw(rs.map(dbTillLa)); }catch(e){} };
+  const setLaddning=(upd)=>{ setLaddningRaw(prev=>{ const next=typeof upd==="function"?upd(prev):upd;
+    if(SB.loggedIn()){ (async()=>{ try{ const c=SB.cfg(); const p={}; prev.forEach(k=>{p[k.id]=k;}); const n={}; next.forEach(k=>{n[k.id]=k;});
+      for(const k of next){ if(!p[k.id]){ const ins=await SB._req("POST","charging_sessions",Object.assign({},laTillDb(k),{org_id:c.orgId})); if(ins&&ins[0]&&ins[0].id){ const g=k.id; setLaddningRaw(l=>l.map(x=>x.id===g?Object.assign({},x,{id:ins[0].id}):x)); } }
+        else if(String(k.id).length>30&&JSON.stringify(p[k.id])!==JSON.stringify(k)){ await SB.update("charging_sessions",k.id,laTillDb(k)); } }
+      for(const k of prev){ if(!n[k.id]&&String(k.id).length>30){ await SB.remove("charging_sessions",k.id); } }
+    }catch(e){ console.warn("laddsync",e); } })(); }
+    return next; }); };
   const [incidenter,setIncidenter]=useState(()=>DB.load("incidenter",INCIDENTER_INIT));
-  const [zoner,setZoner]=useState(()=>DB.load("zoner",ZONER_INIT));
+  const [zoner,setZonerRaw]=useState(()=>DB.load("zoner",ZONER_INIT));
+  const zonTillDb=(z)=>({ namn:z.namn||"Zon", zontyp:z.zontyp||null, regel:(z.regel==="ej_in"?"ej_in":"stanna_inne"), points:(z.points&&z.points.length?z.points:null), center_lat:(z.lat!=null?z.lat:null), center_lng:(z.lng!=null?z.lng:null), radie_km:(z.radieKm!=null?z.radieKm:null), aktiv_fran:z.aktivFran||null, aktiv_till:z.aktivTill||null, dagar:(z.dagar&&z.dagar.length?z.dagar:null), auto_resesyfte:z.autoSyfte||null, auto_resetyp:(z.autoResetyp==="Tjänsteresa"?"tjanst":z.autoResetyp==="Privatresa"?"privat":null), mottagare_mobil:z.mottagare||null });
+  const dbTillZon=(r)=>({ id:r.id, namn:r.namn, regel:r.regel, points:r.points||null, lat:r.center_lat, lng:r.center_lng, radieKm:(r.radie_km!=null?Number(r.radie_km):null), aktivFran:r.aktiv_fran?String(r.aktiv_fran).slice(0,5):"", aktivTill:r.aktiv_till?String(r.aktiv_till).slice(0,5):"", dagar:r.dagar||[1,2,3,4,5], zontyp:r.zontyp||"Arbetsområde", autoSyfte:r.auto_resesyfte||"", autoResetyp:(r.auto_resetyp==="tjanst"?"Tjänsteresa":r.auto_resetyp==="privat"?"Privatresa":""), mottagare:r.mottagare_mobil||r.mottagare_epost||"", objektIds:[] });
+  const laddaZoner=async()=>{ try{ const zs=await SB._req("GET","zones?select=*&order=created_at"); setZonerRaw(zs.map(dbTillZon)); }catch(e){} };
+  const setZoner=(upd)=>{ setZonerRaw(prev=>{ const next=typeof upd==="function"?upd(prev):upd;
+    if(SB.loggedIn()){ (async()=>{ try{ const c=SB.cfg(); const pIds={}; prev.forEach(z=>{pIds[z.id]=z;}); const nIds={}; next.forEach(z=>{nIds[z.id]=z;});
+      for(const z of next){ if(!pIds[z.id]){ const ins=await SB._req("POST","zones",Object.assign({},zonTillDb(z),{org_id:c.orgId})); if(ins&&ins[0]&&ins[0].id){ const nyttId=ins[0].id, gamla=z.id; setZonerRaw(l=>l.map(x=>x.id===gamla?Object.assign({},x,{id:nyttId}):x)); } }
+        else if(String(z.id).length>30&&JSON.stringify(pIds[z.id])!==JSON.stringify(z)){ await SB.update("zones",z.id,zonTillDb(z)); } }
+      for(const z of prev){ if(!nIds[z.id]&&String(z.id).length>30){ await SB.remove("zones",z.id); } }
+    }catch(e){ console.warn("zonsync",e); } })(); }
+    return next; }); };
   const [bokRegler,setBokRegler]=useState(()=>DB.load("bokRegler",{maxDagar:7,slot:60,oppnaFran:"06:00",oppnaTill:"20:00",maxFramAt:90}));
   useEffect(()=>{ const ov={}; resor.forEach(r=>ov[r.id]={resetyp:r.resetyp,resesyfte:r.resesyfte,attesterad:r.attesterad,klassad:r.klassad}); DB.save("resor_ov",ov); },[resor]);
   useEffect(()=>DB.save("kvitton",kvitton),[kvitton]);

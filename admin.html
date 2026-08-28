@@ -155,10 +155,10 @@
 
     <section id="vy-rapporter" class="hidden">
       <div class="flex gap-2 mb-4 flex-wrap">
-        <button class="px-3 py-1.5 rounded-lg text-sm font-medium" style="background:#C2F24D">SMS</button>
-        <button class="px-3 py-1.5 rounded-lg text-sm border border-white/20 text-gray-400 cursor-not-allowed" title="Kommer snart">Körjournal</button>
-        <button class="px-3 py-1.5 rounded-lg text-sm border border-white/20 text-gray-400 cursor-not-allowed" title="Kommer snart">Trafik</button>
+        <button id="rapTabSms" class="px-3 py-1.5 rounded-lg text-sm font-medium" style="background:#C2F24D">SMS</button>
+        <button id="rapTabKj" class="px-3 py-1.5 rounded-lg text-sm font-medium border border-white/20 text-gray-200 hover:bg-white/10">Körjournal</button>
       </div>
+      <div id="rapSidaSms">
       <div class="bg-white rounded-2xl p-6 shadow-xl mb-4">
         <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
           <h2 class="font-display font-bold text-lg">SMS per kund</h2>
@@ -172,6 +172,15 @@
       <div class="bg-white rounded-2xl p-6 shadow-xl">
         <h2 class="font-display font-bold text-lg mb-3">Skapade fakturaunderlag</h2>
         <div id="rapUnderlag" class="space-y-1 text-sm"><div class="text-gray-400">Laddar…</div></div>
+      </div>
+      </div>
+      <div id="rapSidaKj" class="hidden">
+        <div class="bg-white rounded-2xl p-6 shadow-xl">
+          <div class="flex items-center justify-between flex-wrap gap-2 mb-3"><h2 class="font-display font-bold text-lg">Körjournal per kund</h2><button id="kjUppdatera" class="text-sm text-blue-600">Uppdatera</button></div>
+          <div id="kjFel" class="text-xs text-red-600 hidden mb-2"></div>
+          <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-gray-400 border-b text-xs uppercase tracking-wide"><th class="py-2">Kund</th><th>Plan</th><th>Fordon</th><th>Aktiva</th><th>Resor</th><th>Km</th><th>Tj/Pr/Okl</th><th>Senaste</th><th>Pris/fordon</th><th>Abonnemang</th></tr></thead><tbody id="kjRader"><tr><td class="py-3 text-gray-400" colspan="10">Laddar…</td></tr></tbody></table></div>
+          <div class="text-xs text-gray-400 mt-2">Plan och pris per fordon redigeras direkt i tabellen och sparas per kund. Abonnemang = antal fordon × pris (exkl. moms), utöver SMS-kostnaden i SMS-rapporten.</div>
+        </div>
       </div>
     </section>
 
@@ -327,7 +336,21 @@ async function laddaSmsRapport(){ fel("rapFel",""); var p=rapPeriod();
       return "<div class='border rounded-lg p-2 flex flex-wrap gap-2 items-center'><span class='font-medium'>"+esc((x.detaljer&&x.detaljer.kund&&x.detaljer.kund.namn)||"Kund")+"</span><span class='text-xs text-gray-500'>"+x.period_fran+" – "+x.period_till+" · "+x.antal+" SMS · "+kr(Number(x.summa))+" kr</span><span class='text-xs text-gray-400'>"+String(x.created_at||"").slice(0,10)+"</span><button class='rapVisa text-xs border rounded px-2 py-1 hover:bg-gray-100 ml-auto' data-id='"+x.id+"'>Visa / Skriv ut</button></div>"; }).join("")||"<div class='text-gray-400'>Inga fakturaunderlag skapade ännu.</div>";
   }catch(e){ fel("rapFel",e.message); } }
 $("rapUppdatera").onclick=laddaSmsRapport;
-$("rapManad").addEventListener("change",laddaSmsRapport);
+$("rapManad").addEventListener("change",function(){ laddaSmsRapport(); if(!$("rapSidaKj").classList.contains("hidden")) laddaKjRapport(); });
+function vRapSida(s){ $("rapSidaSms").classList.toggle("hidden",s!=="sms"); $("rapSidaKj").classList.toggle("hidden",s!=="kj");
+  $("rapTabSms").setAttribute("style", s==="sms"?"background:#C2F24D":""); $("rapTabSms").className="px-3 py-1.5 rounded-lg text-sm font-medium"+(s==="sms"?"":" border border-white/20 text-gray-200 hover:bg-white/10");
+  $("rapTabKj").setAttribute("style", s==="kj"?"background:#C2F24D":""); $("rapTabKj").className="px-3 py-1.5 rounded-lg text-sm font-medium"+(s==="kj"?"":" border border-white/20 text-gray-200 hover:bg-white/10"); }
+$("rapTabSms").onclick=function(){ vRapSida("sms"); };
+$("rapTabKj").onclick=function(){ vRapSida("kj"); laddaKjRapport(); };
+async function laddaKjRapport(){ fel("kjFel",""); var p=rapPeriod();
+  try{ var j=await apiRep({action:"report_korjournal",fran:p[0],till:p[1]});
+    $("kjRader").innerHTML=(j.rader||[]).map(function(r){ return "<tr class='border-b last:border-0'><td class='py-2 font-medium'>"+esc(r.namn)+"</td><td><select class='kjPlan border rounded px-1 py-0.5 text-xs bg-white' data-org='"+r.org_id+"'>"+["bas","plus","pro"].map(function(pl){return "<option"+(r.plan===pl?" selected":"")+">"+pl+"</option>";}).join("")+"</select></td><td>"+r.fordon+"</td><td>"+r.aktiva_fordon+"</td><td>"+r.resor+"</td><td>"+r.km+"</td><td class='text-gray-500'>"+r.tjanst+"/"+r.privat+"/"+r.oklassad+"</td><td class='text-gray-500'>"+esc(r.senaste)+"</td><td><input class='kjPris border rounded px-2 py-1 text-sm w-20' data-org='"+r.org_id+"' value='"+kr(r.pris_per_fordon)+"'/></td><td class='font-semibold'>"+kr(r.abonnemang)+" kr</td></tr>"; }).join("")||"<tr><td colspan='10' class='py-3 text-gray-400'>Inga kunder.</td></tr>";
+  }catch(e){ fel("kjFel",e.message); } }
+$("kjUppdatera").onclick=laddaKjRapport;
+$("kjRader").addEventListener("change",async function(e){ var s=e.target.closest(".kjPlan"); var i=e.target.closest(".kjPris");
+  try{ if(s) await apiRep({action:"org_set_plan",org_id:s.getAttribute("data-org"),plan:s.value});
+       if(i) await apiRep({action:"org_set_plan",org_id:i.getAttribute("data-org"),pris_per_fordon:i.value});
+       laddaKjRapport(); }catch(err){ alert(err.message); } });
 $("rapRader").addEventListener("change",async function(e){ var i=e.target.closest(".rapPris"); if(!i)return; try{ await apiRep({action:"org_set_sms_pris",org_id:i.getAttribute("data-org"),pris:i.value}); laddaSmsRapport(); }catch(err){ alert(err.message); } });
 $("rapRader").addEventListener("click",async function(e){ var b=e.target.closest(".rapFakt"); if(!b)return; var p=rapPeriod(); b.textContent="Skapar…";
   try{ var j=await apiRep({action:"fakturaunderlag_create",org_id:b.getAttribute("data-org"),fran:p[0],till:p[1]}); visaUnderlag(j.underlag); laddaSmsRapport(); }catch(err){ alert(err.message); b.textContent="Fakturaunderlag"; } });

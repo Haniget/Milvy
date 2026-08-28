@@ -4,6 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Milvy – Flotthantering & körjournal</title>
+<link rel="manifest" href="/manifest.webmanifest"/>
+<meta name="theme-color" content="#0E1726"/>
+<link rel="apple-touch-icon" href="/icon.svg"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Milvy"/>
+<script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js").catch(function(){});});}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
@@ -897,6 +904,9 @@ function Karta({priv}){
   const mapRef=useRef(); const map=useRef(); const markers=useRef({});
   const [endastRorelse,setER]=useState(false); const [sel,setSel]=useState(null);
   const [live,setLive]=useState(false); const [liveData,setLiveData]=useState([]); const [status,setStatus]=useState("");
+  const [tick,setTick]=useState(0);
+  useEffect(()=>{ if(!SB.loggedIn())return; const h=async()=>{ try{ const ps=await SB._req("GET","positions?select=vehicle_id,ts,lat,lng,speed&order=ts.desc&limit=60"); const seen={}; (ps||[]).forEach(p=>{ if(!seen[p.vehicle_id]&&p.lat!=null){ seen[p.vehicle_id]=true; SENASTE_POS[p.vehicle_id]={lat:p.lat,lng:p.lng,tid:new Date(p.ts),adress:"",hast:Math.round(p.speed||0)}; } }); setTick(t=>t+1); }catch(e){} }; const iv=setInterval(h,30000); h(); return ()=>clearInterval(iv); },[]);
+  useEffect(()=>{ if(!live)return; const iv=setInterval(hamtaLive,30000); return ()=>clearInterval(iv); },[live]);
   const hasToken=!!FLESPI.token();
   const mockFordon=FORDON.filter(v=>!endastRorelse||v.status==="aktiv");
   async function hamtaLive(){ setStatus("Hämtar från flespi…");
@@ -913,7 +923,7 @@ function Karta({priv}){
   useEffect(()=>{ if(!map.current)return; Object.values(markers.current).forEach(m=>map.current.removeLayer(m)); markers.current={};
     if(live){ liveData.filter(d=>d.active).forEach(d=>{ const m=L.marker([d.lat,d.lng]).addTo(map.current); m.bindPopup("<b>"+d.name+"</b><br>"+(d.ts?fmtKlock(d.ts):"")+"<br>"+d.speed+" km/h"+(d.ignition?" · tändning på":"")); markers.current["d"+d.id]=m; }); }
     else { mockFordon.forEach(v=>{ const p=SENASTE_POS[v.id]; if(!p)return; const m=L.marker([p.lat,p.lng]).addTo(map.current); m.bindPopup("<b>"+v.regNr+"</b><br>"+v.fordonsansvarig+"<br>"+fmtKlock(p.tid)+"<br>"+p.hast+" km/h"); markers.current[v.id]=m; }); }
-  },[live,liveData,endastRorelse]);
+  },[live,liveData,endastRorelse,tick]);
   const centerMock=(v)=>{ const p=SENASTE_POS[v.id]; if(!p)return; setSel(v.id); map.current.setView([p.lat,p.lng],13); markers.current[v.id]&&markers.current[v.id].openPopup(); };
   const centerLive=(d)=>{ if(!d.active)return; setSel("d"+d.id); map.current.setView([d.lat,d.lng],13); markers.current["d"+d.id]&&markers.current["d"+d.id].openPopup(); };
   return (<div className="space-y-4">
@@ -2117,6 +2127,21 @@ function DbConnectModal({onClose,onConnected}){
   </Card></div>);
 }
 
+function PrivatLage(){
+  const [till,setTill]=useState(null); const [busy,setBusy]=useState(false);
+  const c=SB.cfg();
+  useEffect(()=>{ if(SB.loggedIn()&&c.driverId){ SB._req("GET","drivers?select=privat_till&id=eq."+c.driverId).then(rs=>{ if(rs&&rs[0]&&rs[0].privat_till) setTill(new Date(rs[0].privat_till)); }).catch(()=>{}); } },[]);
+  if(!SB.loggedIn()||!c.driverId) return null;
+  const aktiv=till&&till>new Date();
+  const toggla=async()=>{ setBusy(true); try{
+    if(aktiv){ await SB.update("drivers",c.driverId,{privat_till:null}); setTill(null); }
+    else{ const t=new Date(Date.now()+8*3600*1000); await SB.update("drivers",c.driverId,{privat_till:t.toISOString()}); setTill(t); }
+  }catch(e){ alert("Kunde inte ändra privatläge: "+(e.message||e)); } setBusy(false); };
+  const fmt=(d)=>String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+  return (<button onClick={toggla} disabled={busy} title="Resor under privatläge klassas privata och adresser döljs" className={"fixed bottom-5 left-5 md:left-60 z-[1300] rounded-full shadow-xl px-4 py-3 text-sm font-semibold "+(aktiv?"text-white":"bg-white border")} style={aktiv?{background:"#7C3AED"}:{}}>
+    {aktiv?("🔒 Privat till "+fmt(till)):"🔓 Privatläge: av"}
+  </button>);
+}
 function SupportChat(){
   const [open,setOpen]=useState(false);
   const [tickets,setTickets]=useState([]);
@@ -2282,6 +2307,7 @@ function App(){
   return (<div className="min-h-screen md:flex" key={cfgVer}>
     <Header route={route} setRoute={setRoute} openSettings={openSettings} navOpen={navOpen} setNavOpen={setNavOpen} roll={roll} setRoll={(r)=>{setRoll(r); setRoute(r==="forare"?{name:"forare_resor"}:{name:"oversikt"}); setNavOpen(false);}}/>
     <SupportChat/>
+    <PrivatLage/>
     {navOpen&&<div className="fixed inset-0 bg-black/40 z-[1150] md:hidden" onClick={()=>setNavOpen(false)}></div>}
     <div className="flex-1 min-w-0 flex flex-col">
     <div className="md:hidden sticky top-0 z-[1100] flex items-center gap-3 h-12 px-4 text-white" style={{background:"#0E1726"}}>

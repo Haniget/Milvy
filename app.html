@@ -881,7 +881,7 @@ function Karta({priv}){
         return {id:d.id,name:d.name||("#"+d.id),lat,lng,speed:Math.round(g(t,"position.speed")||0),ignition:g(t,"engine.ignition.status"),ts:tsRaw?new Date(tsRaw*1000):null,active:lat!=null&&lng!=null}; });
       setLiveData(data); const akt=data.filter(d=>d.active).length; setStatus("✓ "+akt+" enhet(er) med position · "+(data.length-akt)+" väntar på data");
     }catch(e){ setStatus("✗ "+e.message); setLiveData([]); } }
-  useEffect(()=>{ map.current=L.map(mapRef.current).setView([59.61,16.55],8); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",maxZoom:19}).addTo(map.current);
+  useEffect(()=>{ map.current=L.map(mapRef.current).setView([59.61,16.55],8); L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ",{attribution:"© Mapbox © OpenStreetMap",maxZoom:19}).addTo(map.current);
     const inv=()=>{ if(map.current) map.current.invalidateSize(); }; const t1=setTimeout(inv,250), t2=setTimeout(inv,800); window.addEventListener("resize",inv);
     return ()=>{ clearTimeout(t1); clearTimeout(t2); window.removeEventListener("resize",inv); map.current.remove(); }; },[]);
   useEffect(()=>{ if(live) hamtaLive(); },[live]);
@@ -916,8 +916,8 @@ function TripMapModal({resa,onClose}){
     return out; },[resa.id]);
   const [idx,setIdx]=useState(0); const [playing,setPlaying]=useState(true); const [speed,setSpeed]=useState(5); const [sat,setSat]=useState(false);
   const medel=Math.round(resa.avstandKm/Math.max(0.1,resa.restidMin/60));
-  const OSM="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", ESRI="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-  useEffect(()=>{ const m=L.map(ref.current); map.current=m; baseRef.current=L.tileLayer(OSM,{attribution:"© OpenStreetMap"}).addTo(m);
+  const OSM="https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ", ESRI="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+  useEffect(()=>{ const m=L.map(ref.current); map.current=m; baseRef.current=L.tileLayer(OSM,{attribution:"© Mapbox © OpenStreetMap"}).addTo(m);
     const ll=path.map(p=>[p.lat,p.lng]);
     L.polyline(ll,{color:"#0E1726",weight:5,opacity:.22}).addTo(m);
     travRef.current=L.polyline([ll[0]],{color:"#2F4BFF",weight:5}).addTo(m);
@@ -947,7 +947,7 @@ function TripMapModal({resa,onClose}){
 }
 function DayRouteModal({resor,datum,onClose}){
   const ref=useRef();
-  useEffect(()=>{ const m=L.map(ref.current); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(m);
+  useEffect(()=>{ const m=L.map(ref.current); L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ",{attribution:"© Mapbox © OpenStreetMap"}).addTo(m);
     const allp=[], farger=["#2F4BFF","#0E1726","#16a34a","#dc2626","#a855f7","#ea580c","#0891b2","#d97706"];
     resor.forEach((r,i)=>{ if(r.startLat==null)return; const a=[r.startLat,r.startLng], b=[r.stoppLat,r.stoppLng], c=farger[i%farger.length];
       L.polyline([a,b],{color:c,weight:4,opacity:.8}).addTo(m).bindPopup(r.forareNamn+" · "+r.avstandKm+" km · "+fmtTid(r.startTid));
@@ -1178,7 +1178,7 @@ function Laddning({laddning,setLaddning}){
 function SkadeKarta(){
   const ref=useRef(); const map=useRef(); const [issues,setIssues]=useState(null);
   useEffect(()=>{ let on=true; (async()=>{ if(!SB.loggedIn())return; try{ const r=await SB.listIssues(); if(on&&Array.isArray(r)) setIssues(r); }catch(e){ if(on)setIssues([]); } })(); return ()=>{on=false;}; },[]);
-  useEffect(()=>{ if(!issues||!issues.length||!ref.current) return; const m=L.map(ref.current); map.current=m; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(m);
+  useEffect(()=>{ if(!issues||!issues.length||!ref.current) return; const m=L.map(ref.current); map.current=m; L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ",{attribution:"© Mapbox © OpenStreetMap"}).addTo(m);
     const farg={Ny:"#dc2626",Mottagen:"#d97706","Åtgärdad":"#16a34a"}; const pts=[];
     issues.forEach(it=>{ if(it.lat==null||it.lng==null)return; const c=farg[it.status]||"#dc2626";
       const mk=L.circleMarker([it.lat,it.lng],{radius:9,color:c,fillColor:c,fillOpacity:0.85,weight:2}).addTo(m);
@@ -1265,7 +1265,7 @@ function Zoner({zoner,setZoner}){
   const [tFran,setTFran]=useState(""); const [tTill,setTTill]=useState(""); const [dagar,setDagar]=useState([1,2,3,4,5]);
   const [zontyp,setZontyp]=useState("Arbetsområde"); const [autoSyfte,setAutoSyfte]=useState(""); const [autoResetyp,setAutoResetyp]=useState(""); const [mottagare,setMottagare]=useState("");
   const toggleDag=(d)=>setDagar(ds=>ds.includes(d)?ds.filter(x=>x!==d):[...ds,d]);
-  useEffect(()=>{ map.current=L.map(mapRef.current).setView([59.61,16.55],10); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",maxZoom:19}).addTo(map.current);
+  useEffect(()=>{ map.current=L.map(mapRef.current).setView([59.61,16.55],10); L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ",{attribution:"© Mapbox © OpenStreetMap",maxZoom:19}).addTo(map.current);
     const inv=()=>{ if(map.current){ map.current.invalidateSize(); map.current.setView([59.61,16.55],10); } };
     const t1=setTimeout(inv,250), t2=setTimeout(inv,800); window.addEventListener("resize",inv);
     return ()=>{ clearTimeout(t1); clearTimeout(t2); window.removeEventListener("resize",inv); map.current.remove(); }; },[]);
@@ -1461,7 +1461,7 @@ function PositionsHistorik({resor}){
     const v=FORDON.find(x=>x.regNr===reg); const trips=resor.filter(r=>r.fordonId===(v&&v.id)&&fmtDatum(r.startTid)===dag).sort((a,b)=>a.startTid-b.startTid); const pts=[];
     trips.forEach(r=>{ const a=[r.startLat,r.startLng],b=[r.stoppLat,r.stoppLng]; layers.current.push(L.polyline([a,b],{color:"#2F4BFF",weight:4,opacity:.7}).addTo(map.current)); layers.current.push(L.circleMarker(a,{radius:4,color:"#16a34a",fillColor:"#16a34a",fillOpacity:1}).addTo(map.current).bindPopup("Start "+fmtTid(r.startTid))); layers.current.push(L.circleMarker(b,{radius:4,color:"#dc2626",fillColor:"#dc2626",fillOpacity:1}).addTo(map.current).bindPopup("Stopp "+fmtTid(r.stoppTid))); pts.push(a,b); });
     if(pts.length) map.current.fitBounds(pts,{padding:[40,40]}); };
-  useEffect(()=>{ map.current=L.map(ref.current).setView([59.61,16.55],11); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(map.current); const t=setTimeout(()=>{ if(map.current){map.current.invalidateSize(); visa();} },300); return ()=>{clearTimeout(t); map.current.remove();}; },[]);
+  useEffect(()=>{ map.current=L.map(ref.current).setView([59.61,16.55],11); L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ",{attribution:"© Mapbox © OpenStreetMap"}).addTo(map.current); const t=setTimeout(()=>{ if(map.current){map.current.invalidateSize(); visa();} },300); return ()=>{clearTimeout(t); map.current.remove();}; },[]);
   const inp="px-3 py-2 border rounded-lg text-sm";
   return (<div className="space-y-3"><div className="flex gap-2 flex-wrap items-end"><div><div className={lblmono+" mb-1"}>Fordon</div><select value={reg} onChange={e=>setReg(e.target.value)} className={inp}>{FORDON.map(v=>(<option key={v.id} value={v.regNr}>{v.regNr}</option>))}</select></div><div><div className={lblmono+" mb-1"}>Datum</div><input type="date" value={dag} onChange={e=>setDag(e.target.value)} className={inp}/></div><button onClick={visa} className="px-4 py-2 rounded-lg text-white text-sm font-medium" style={{background:"#0E1726"}}>Visa rutt</button></div>
     <Card className="overflow-hidden h-[460px]"><div ref={ref} className="w-full h-full"></div></Card></div>);
@@ -1784,7 +1784,7 @@ function FelrapportModal({onClose,onSave,defaultPos}){
   const onFile=(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f)return; const rd=new FileReader(); rd.onload=()=>setBild(rd.result); rd.readAsDataURL(f); };
   const revGeo=async(lat,lng)=>{ try{ const r=await fetch("https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&lat="+lat+"&lon="+lng,{headers:{"Accept-Language":"sv"}}); const j=await r.json(); if(j&&j.display_name) setAdress(j.display_name); }catch(e){} };
   const flytta=(lat,lng,z)=>{ setPos({lat,lng}); if(mapRef.current){ if(z)mapRef.current.setView([lat,lng],z); markRef.current&&markRef.current.setLatLng([lat,lng]); } };
-  useEffect(()=>{ const m=L.map(ref.current).setView([pos.lat,pos.lng],14); mapRef.current=m; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(m);
+  useEffect(()=>{ const m=L.map(ref.current).setView([pos.lat,pos.lng],14); mapRef.current=m; L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ",{attribution:"© Mapbox © OpenStreetMap"}).addTo(m);
     markRef.current=L.marker([pos.lat,pos.lng],{draggable:true}).addTo(m);
     markRef.current.on("dragend",e=>{ const p=e.target.getLatLng(); setPos({lat:p.lat,lng:p.lng}); revGeo(p.lat,p.lng); });
     m.on("click",e=>{ markRef.current.setLatLng(e.latlng); setPos({lat:e.latlng.lat,lng:e.latlng.lng}); revGeo(e.latlng.lat,e.latlng.lng); });
@@ -1805,7 +1805,7 @@ function FelrapportModal({onClose,onSave,defaultPos}){
 }
 function BilKartaModal({lat,lng,adress,onClose}){
   const ref=useRef();
-  useEffect(()=>{ const m=L.map(ref.current).setView([lat,lng],15); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(m); L.marker([lat,lng]).addTo(m).bindPopup(adress).openPopup(); const t=setTimeout(()=>m.invalidateSize(),250); return ()=>{ clearTimeout(t); m.remove(); }; },[]);
+  useEffect(()=>{ const m=L.map(ref.current).setView([lat,lng],15); L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ",{attribution:"© Mapbox © OpenStreetMap"}).addTo(m); L.marker([lat,lng]).addTo(m).bindPopup(adress).openPopup(); const t=setTimeout(()=>m.invalidateSize(),250); return ()=>{ clearTimeout(t); m.remove(); }; },[]);
   return (<div className="fixed inset-0 bg-black/50 z-[2300] flex items-center justify-center p-4" onClick={onClose}><Card className="w-[600px] max-w-full overflow-hidden" onClick={e=>e.stopPropagation()}><div className="flex items-center justify-between p-4 border-b"><div><div className="font-bold">Var står bilen?</div><div className="text-xs text-gray-500">{adress}</div></div><button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button></div><div ref={ref} style={{height:380}}></div></Card></div>);
 }
 

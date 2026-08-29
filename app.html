@@ -1008,11 +1008,24 @@ function DayRouteModal({resor,datum,onClose}){
   const ref=useRef();
   useEffect(()=>{ const m=L.map(ref.current); L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ",{attribution:"© Mapbox © OpenStreetMap"}).addTo(m);
     const allp=[], farger=["#2F4BFF","#0E1726","#16a34a","#dc2626","#a855f7","#ea580c","#0891b2","#d97706"];
-    resor.forEach((r,i)=>{ if(r.startLat==null)return; const a=[r.startLat,r.startLng], b=[r.stoppLat,r.stoppLng], c=farger[i%farger.length];
-      L.polyline([a,b],{color:c,weight:4,opacity:.8}).addTo(m).bindPopup(r.forareNamn+" · "+r.avstandKm+" km · "+fmtTid(r.startTid));
-      L.circleMarker(a,{radius:4,color:c,fillColor:c,fillOpacity:1}).addTo(m); allp.push(a,b); });
-    if(allp.length) m.fitBounds(allp,{padding:[40,40]});
-    const t=setTimeout(()=>m.invalidateSize(),250); return ()=>{ clearTimeout(t); m.remove(); }; },[]);
+    let avbruten=false;
+    (async()=>{
+      for(let i=0;i<resor.length;i++){ const r=resor[i]; if(r.startLat==null) continue;
+        let ll=[[r.startLat,r.startLng],[r.stoppLat,r.stoppLng]];
+        if(r._real&&r.vehicleId&&SB.loggedIn()){ try{
+          const fran=new Date(r.startTid.getTime()-60000).toISOString(); const till=new Date(r.stoppTid.getTime()+180000).toISOString();
+          const ps=await SB._req("GET","positions?select=lat,lng&vehicle_id=eq."+r.vehicleId+"&ts=gte."+fran+"&ts=lte."+till+"&order=ts.asc&limit=3000");
+          if(ps&&ps.length>=2) ll=ps.map(p=>[p.lat,p.lng]);
+        }catch(e){} }
+        if(avbruten) return;
+        const c=farger[i%farger.length];
+        L.polyline(ll,{color:c,weight:4,opacity:.8}).addTo(m).bindPopup(r.forareNamn+" · "+r.avstandKm+" km · "+fmtTid(r.startTid));
+        L.circleMarker(ll[0],{radius:4,color:c,fillColor:c,fillOpacity:1}).addTo(m);
+        ll.forEach(p=>allp.push(p));
+      }
+      if(allp.length&&!avbruten) m.fitBounds(allp,{padding:[40,40]});
+    })();
+    const t=setTimeout(()=>m.invalidateSize(),250); return ()=>{ avbruten=true; clearTimeout(t); m.remove(); }; },[]);
   const totKm=resor.reduce((s,r)=>s+r.avstandKm,0);
   return (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[2000] p-2 sm:p-4" onClick={onClose}>
     <Card className="w-[900px] max-w-full overflow-hidden" onClick={e=>e.stopPropagation()}>

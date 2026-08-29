@@ -961,11 +961,18 @@ function Karta({priv}){
 /* ============================ KÖRJOURNAL ============================ */
 function TripMapModal({resa,onClose}){
   const ref=useRef(); const map=useRef(); const baseRef=useRef(); const carRef=useRef(); const travRef=useRef();
-  const path=useMemo(()=>{ const n=26,out=[]; const dLat=resa.stoppLat-resa.startLat, dLng=resa.stoppLng-resa.startLng; const dur=resa.stoppTid-resa.startTid;
-    for(let i=0;i<=n;i++){ const t=i/n, cu=Math.sin(t*Math.PI);
-      out.push({ lat:resa.startLat+dLat*t+(-dLng)*cu*0.12+Math.sin(i*1.7)*0.0004, lng:resa.startLng+dLng*t+dLat*cu*0.12+Math.cos(i*1.9)*0.0004,
+  const syntetisk=useMemo(()=>{ const n=26,out=[]; const dLat=resa.stoppLat-resa.startLat, dLng=resa.stoppLng-resa.startLng; const dur=resa.stoppTid-resa.startTid;
+    for(let i=0;i<=n;i++){ const t=i/n;
+      out.push({ lat:resa.startLat+dLat*t, lng:resa.startLng+dLng*t,
         tid:new Date(resa.startTid.getTime()+dur*t), speed:Math.max(0,Math.round(resa.hogstaHastighet*(0.45+0.55*Math.sin(t*Math.PI)))) }); }
     return out; },[resa.id]);
+  const [path,setPath]=useState(syntetisk);
+  useEffect(()=>{ setPath(syntetisk); setIdx(0);
+    if(resa._real&&resa.vehicleId&&SB.loggedIn()){ (async()=>{ try{
+      const fran=new Date(resa.startTid.getTime()-60000).toISOString(); const till=new Date(resa.stoppTid.getTime()+180000).toISOString();
+      const ps=await SB._req("GET","positions?select=ts,lat,lng,speed&vehicle_id=eq."+resa.vehicleId+"&ts=gte."+fran+"&ts=lte."+till+"&order=ts.asc&limit=3000");
+      if(ps&&ps.length>=2){ setPath(ps.map(p=>({lat:p.lat,lng:p.lng,tid:new Date(p.ts),speed:Math.round(p.speed||0)}))); setIdx(0); }
+    }catch(e){} })(); } },[resa.id]);
   const [idx,setIdx]=useState(0); const [playing,setPlaying]=useState(true); const [speed,setSpeed]=useState(5); const [sat,setSat]=useState(false);
   const medel=Math.round(resa.avstandKm/Math.max(0.1,resa.restidMin/60));
   const OSM="https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYWJyb3ZhMjAyNSIsImEiOiJjbXRjcDljMmIwaHpwMndyNjhnN2hmMWZuIn0.VZImp8YxNG3X0WSITbvaHQ", ESRI="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
@@ -976,7 +983,7 @@ function TripMapModal({resa,onClose}){
     L.circleMarker(ll[0],{radius:6,color:"#16a34a",fillColor:"#16a34a",fillOpacity:1}).addTo(m).bindPopup("Start "+fmtTid(resa.startTid));
     L.circleMarker(ll[ll.length-1],{radius:6,color:"#dc2626",fillColor:"#dc2626",fillOpacity:1}).addTo(m).bindPopup("Stopp "+fmtTid(resa.stoppTid));
     carRef.current=L.marker(ll[0],{icon:L.divIcon({className:"",html:'<div style="width:16px;height:16px;border-radius:50%;background:#0E1726;border:3px solid #C2F24D"></div>',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(m).bindTooltip("",{permanent:true,direction:"top",offset:[0,-8]});
-    m.fitBounds(ll,{padding:[40,40]}); const t=setTimeout(()=>m.invalidateSize(),250); return ()=>{ clearTimeout(t); m.remove(); }; },[]);
+    m.fitBounds(ll,{padding:[40,40]}); const t=setTimeout(()=>m.invalidateSize(),250); return ()=>{ clearTimeout(t); m.remove(); }; },[path]);
   useEffect(()=>{ if(baseRef.current) baseRef.current.setUrl(sat?ESRI:OSM); },[sat]);
   useEffect(()=>{ if(!playing)return; const iv=setInterval(()=>{ setIdx(i=> i>=path.length-1 ? i : i+1); },420/speed); return ()=>clearInterval(iv); },[playing,speed,path]);
   useEffect(()=>{ if(idx>=path.length-1) setPlaying(false); const p=path[idx]; if(!p||!carRef.current)return; carRef.current.setLatLng([p.lat,p.lng]); carRef.current.setTooltipContent(p.speed+" km/h · "+fmtTid(p.tid)); if(travRef.current) travRef.current.setLatLngs(path.slice(0,idx+1).map(q=>[q.lat,q.lng])); },[idx]);
@@ -1909,7 +1916,7 @@ function AdressSok({value,onChange,onPick,pick,placeholder,className}){
 }
 function ForarVy({driver,resor,setResor}){
   const [realTrips,setRealTrips]=useState(null);
-  const mapTrip=(row)=>({ id:row.id, _real:true, forareId:driver.id, forareNamn:driver.namn, fordonRegNr:(row.vehicles&&row.vehicles.reg_nr)||"—", startAdress:row.start_adress||"Okänd plats", stoppAdress:row.stop_adress||"Okänd plats", startTid:new Date(row.start_tid), stoppTid:new Date(row.stop_tid||row.start_tid), startLat:row.start_lat, startLng:row.start_lng, stoppLat:row.stop_lat, stoppLng:row.stop_lng, avstandKm:Number(row.avstand_km)||0, restidMin:row.restid_min||0, hogstaHastighet:row.hogsta_hastighet||0, matarStart:row.matar_start||0, matarStopp:row.matar_stop||0, co2Kg:Number(row.co2_kg)||0, forbrukningLiter:Number(row.forbrukning_l)||0, resetyp:row.resetyp==="privat"?"Privatresa":"Tjänsteresa", resesyfte:row.resesyfte||"", klassad:!!row.klassad });
+  const mapTrip=(row)=>({ id:row.id, _real:true, vehicleId:row.vehicle_id||"", forareId:driver.id, forareNamn:driver.namn, fordonRegNr:(row.vehicles&&row.vehicles.reg_nr)||"—", startAdress:row.start_adress||"Okänd plats", stoppAdress:row.stop_adress||"Okänd plats", startTid:new Date(row.start_tid), stoppTid:new Date(row.stop_tid||row.start_tid), startLat:row.start_lat, startLng:row.start_lng, stoppLat:row.stop_lat, stoppLng:row.stop_lng, avstandKm:Number(row.avstand_km)||0, restidMin:row.restid_min||0, hogstaHastighet:row.hogsta_hastighet||0, matarStart:row.matar_start||0, matarStopp:row.matar_stop||0, co2Kg:Number(row.co2_kg)||0, forbrukningLiter:Number(row.forbrukning_l)||0, resetyp:row.resetyp==="privat"?"Privatresa":"Tjänsteresa", resesyfte:row.resesyfte||"", klassad:!!row.klassad });
   const akta=!!(realTrips&&realTrips.length>0);
   const mina=akta?realTrips:resor.filter(r=>r.forareId===driver.id).sort((a,b)=>b.startTid-a.startTid);
   const fnamn=driver.namn.split(" ")[0];
@@ -2298,7 +2305,7 @@ function App(){
   const [route,setRoute]=useState({name:"oversikt"});
   const [resor,setResorRaw]=useState(()=>applyResorOv(RESOR));
   const [dbAdmin,setDbAdmin]=useState(false); const dbAdminRef=useRef(false); const [dbConnect,setDbConnect]=useState(false);
-  const mapDbTrip=(row)=>({ id:row.id,_real:true, forareId:row.driver_id||"", forareNamn:(row.drivers&&row.drivers.namn)||"—", fordonRegNr:(row.vehicles&&row.vehicles.reg_nr)||"—", startAdress:row.start_adress||"Okänd plats", stoppAdress:row.stop_adress||"Okänd plats", startTid:new Date(row.start_tid), stoppTid:new Date(row.stop_tid||row.start_tid), startLat:row.start_lat, startLng:row.start_lng, stoppLat:row.stop_lat, stoppLng:row.stop_lng, avstandKm:Number(row.avstand_km)||0, restidMin:row.restid_min||0, hogstaHastighet:row.hogsta_hastighet||0, matarStart:row.matar_start||0, matarStopp:row.matar_stop||0, co2Kg:Number(row.co2_kg)||0, forbrukningLiter:Number(row.forbrukning_l)||0, resetyp:row.resetyp==="privat"?"Privatresa":"Tjänsteresa", resesyfte:row.resesyfte||"", klassad:!!row.klassad, attesterad:!!row.attesterad });
+  const mapDbTrip=(row)=>({ id:row.id,_real:true, vehicleId:row.vehicle_id||"", forareId:row.driver_id||"", forareNamn:(row.drivers&&row.drivers.namn)||"—", fordonRegNr:(row.vehicles&&row.vehicles.reg_nr)||"—", startAdress:row.start_adress||"Okänd plats", stoppAdress:row.stop_adress||"Okänd plats", startTid:new Date(row.start_tid), stoppTid:new Date(row.stop_tid||row.start_tid), startLat:row.start_lat, startLng:row.start_lng, stoppLat:row.stop_lat, stoppLng:row.stop_lng, avstandKm:Number(row.avstand_km)||0, restidMin:row.restid_min||0, hogstaHastighet:row.hogsta_hastighet||0, matarStart:row.matar_start||0, matarStopp:row.matar_stop||0, co2Kg:Number(row.co2_kg)||0, forbrukningLiter:Number(row.forbrukning_l)||0, resetyp:row.resetyp==="privat"?"Privatresa":"Tjänsteresa", resesyfte:row.resesyfte||"", klassad:!!row.klassad, attesterad:!!row.attesterad });
   const setResor=(updater)=>{ setResorRaw(prev=>{ const next=typeof updater==="function"?updater(prev):updater;
     if(dbAdminRef.current&&SB.loggedIn()){ const byId={}; prev.forEach(r=>byId[r.id]=r);
       next.forEach(r=>{ if(!r._real)return; const p=byId[r.id]; if(!p)return; const patch={};
